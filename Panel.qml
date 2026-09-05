@@ -435,7 +435,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(280))
+    contentWidth: panel.fittedContentWidth(Style.space(480))
     // No fixed cap: seven interactive rows plus an unbounded session list fit no
     // constant. fittedContentHeight's own screen-bound availableCardHeight is the
     // real limit, as it is for the first-party bluetooth, clock, weather, power
