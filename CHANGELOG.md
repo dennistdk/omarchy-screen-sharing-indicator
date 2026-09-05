@@ -27,8 +27,13 @@ Initial release.
 - Widget dropdown: live session list, four toggles, six colour swatches plus an
   `auto` contrast mode, a border-width stepper, and a three-second preview border.
 - Health checks in the dropdown for the layer rule and for `cursor_mode` in
-  `xdph.conf`, the latter with a one-click fix that refuses while a share is
-  running.
+  `xdph.conf`, each with a one-click fix. The cursor fix refuses while a share is
+  running, since it restarts the portal; the layer-rule fix does not need to,
+  since `hyprctl reload` cannot drop a capture.
+- **Load the layer rule** button: backs up `~/.config/hypr/hyprland.lua`, appends
+  the guarded loader with the plugin's real install path, and reloads Hyprland.
+  It emits the `io.open` guard and the `pcall` every time, which hand-copying is
+  the one path that can get wrong.
 - Optional desktop notifications when a share starts and stops (`notify`, off
   by default). Settings changes and preview borders never fire one.
 - `omarchy-shell screen-sharing-indicator status` for the session table, the

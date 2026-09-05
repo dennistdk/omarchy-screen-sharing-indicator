@@ -1275,3 +1275,63 @@ test("applyCursorModeFix on CRLF input: pinning current behaviour, not asserting
   const after = "screencopy {\r\n    cursor_mode = 2\n    allow_token_by_default = true\r\n}\r\n"
   assert.equal(M.applyCursorModeFix(before), after)
 })
+
+// ------------------------------------------------- layer rule snippet writing
+
+const PLUGDIR = "/home/u/.config/omarchy/plugins/io.github.dennistdk.screen-sharing-indicator"
+
+test("applyLayerRuleSnippet appends a guarded loader to a config that lacks one", () => {
+  const out = M.applyLayerRuleSnippet('require("hypr.monitors")\n', PLUGDIR)
+  assert.match(out, /local f = io\.open\(path, "r"\)/)
+  assert.match(out, /pcall\(dofile, path\)/)
+  assert.ok(out.includes(PLUGDIR + "/hypr.lua"))
+})
+
+test("applyLayerRuleSnippet preserves every existing byte, appending only", () => {
+  const before = '-- mine\nrequire("hypr.input")\n'
+  const out = M.applyLayerRuleSnippet(before, PLUGDIR)
+  assert.equal(out.slice(0, before.length), before)
+})
+
+test("applyLayerRuleSnippet is idempotent: a second call has nothing to do", () => {
+  const once = M.applyLayerRuleSnippet('require("hypr.input")\n', PLUGDIR)
+  assert.equal(M.applyLayerRuleSnippet(once, PLUGDIR), null)
+})
+
+test("applyLayerRuleSnippet recognises the hand-written README form as present", () => {
+  const manual = 'do\n  local path = (os.getenv("HOME") or "") ..' +
+    ' "/.config/omarchy/plugins/screen-sharing-indicator/hypr.lua"\nend\n'
+  assert.equal(M.applyLayerRuleSnippet(manual, PLUGDIR), null)
+})
+
+test("applyLayerRuleSnippet treats a commented-out loader as absent, not as present", () => {
+  const commented = '-- local path = ".../screen-sharing-indicator/hypr.lua"\n'
+  assert.notEqual(M.applyLayerRuleSnippet(commented, PLUGDIR), null)
+})
+
+test("applyLayerRuleSnippet gives a file with no trailing newline one before appending", () => {
+  const out = M.applyLayerRuleSnippet('require("hypr.input")', PLUGDIR)
+  assert.ok(out.startsWith('require("hypr.input")\n'))
+})
+
+test("applyLayerRuleSnippet handles an empty config", () => {
+  const out = M.applyLayerRuleSnippet("", PLUGDIR)
+  assert.match(out, /pcall\(dofile, path\)/)
+})
+
+test("applyLayerRuleSnippet refuses a directory it cannot safely quote into Lua", () => {
+  assert.equal(M.applyLayerRuleSnippet("", '/tmp/we"ird'), null)
+  assert.equal(M.applyLayerRuleSnippet("", "/tmp/two\nlines"), null)
+  assert.equal(M.applyLayerRuleSnippet("", "/tmp/back\\slash"), null)
+})
+
+test("applyLayerRuleSnippet refuses an empty plugin directory rather than guessing", () => {
+  assert.equal(M.applyLayerRuleSnippet("", ""), null)
+  assert.equal(M.applyLayerRuleSnippet("", null), null)
+})
+
+test("applyLayerRuleSnippet strips a trailing slash from the plugin directory", () => {
+  const out = M.applyLayerRuleSnippet("", PLUGDIR + "/")
+  assert.ok(out.includes(PLUGDIR + "/hypr.lua"))
+  assert.ok(!out.includes("//hypr.lua"))
+})

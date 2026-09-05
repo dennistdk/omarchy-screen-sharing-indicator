@@ -991,6 +991,63 @@ function applyCursorModeFix(content) {
   return lines.join("\n")
 }
 
+// ------------------------------------------------------- layer rule snippet
+
+// True when this config already loads the plugin's hypr.lua. Comments are
+// stripped first, so a commented-out reference reads as absent -- the same
+// call parseCursorMode makes about a commented-out cursor_mode, and for the
+// same reason: a line Hyprland will not execute is not a rule that is loaded.
+function layerRuleSnippetPresent(content) {
+  var lines = String(content === undefined || content === null ? "" : content).split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var stripped = lines[i].replace(/--.*$/, "")
+    if (stripped.indexOf("hypr.lua") >= 0 && stripped.indexOf("screen-sharing-indicator") >= 0) return true
+  }
+  return false
+}
+
+// The guarded loader, emitted rather than copied by hand. The io.open check and
+// the pcall are the whole reason this is worth automating: a bare dofile breaks
+// the user's entire Hyprland config the moment the plugin is uninstalled, and a
+// hand-copied snippet is exactly where that guard goes missing.
+function layerRuleSnippet(pluginDir) {
+  return "\n"
+    + "-- screen-sharing-indicator: loads the layer rule that keeps the border out\n"
+    + "-- of monitor captures. Added by the plugin's \"Load the layer rule\" button.\n"
+    + "-- Keep the io.open guard and the pcall: a bare dofile breaks this whole\n"
+    + "-- config the moment the plugin is uninstalled.\n"
+    + "do\n"
+    + "  local path = \"" + pluginDir + "/hypr.lua\"\n"
+    + "  local f = io.open(path, \"r\")\n"
+    + "  if f then\n"
+    + "    f:close()\n"
+    + "    local ok, err = pcall(dofile, path)\n"
+    + "    if not ok then\n"
+    + "      io.stderr:write(\"screen-sharing-indicator hypr.lua: \" .. tostring(err) .. \"\\n\")\n"
+    + "    end\n"
+    + "  end\n"
+    + "end\n"
+}
+
+// Returns the new file contents, or null for "nothing to do" -- already
+// present, or a directory this cannot safely quote into a Lua string. Null is
+// not failure: the caller writes nothing and leaves the file untouched.
+// Existing content is preserved byte for byte; this only ever appends.
+function applyLayerRuleSnippet(content, pluginDir) {
+  var dir = String(pluginDir === undefined || pluginDir === null ? "" : pluginDir).replace(/\/+$/, "")
+  if (dir === "") return null
+  // A quote or newline in the path would break out of the Lua string literal.
+  // Refusing beats emitting a config that fails to parse.
+  if (/["\n\\]/.test(dir)) return null
+
+  var text = String(content === undefined || content === null ? "" : content)
+  if (layerRuleSnippetPresent(text)) return null
+
+  var base = text
+  if (base !== "" && base.charAt(base.length - 1) !== "\n") base += "\n"
+  return base + layerRuleSnippet(dir)
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     OWNER_MONITOR: OWNER_MONITOR,
@@ -1045,6 +1102,9 @@ if (typeof module !== "undefined") {
     cursorState: cursorState,
     layerRuleSeverity: layerRuleSeverity,
     cursorSeverity: cursorSeverity,
-    applyCursorModeFix: applyCursorModeFix
+    applyCursorModeFix: applyCursorModeFix,
+    layerRuleSnippetPresent: layerRuleSnippetPresent,
+    layerRuleSnippet: layerRuleSnippet,
+    applyLayerRuleSnippet: applyLayerRuleSnippet
   }
 }

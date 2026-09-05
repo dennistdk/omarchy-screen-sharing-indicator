@@ -55,7 +55,15 @@ Either way, enabling drops an eye icon into your bar's right section - see
 
 ### Then do this - it is not optional
 
-Add this to the personal section of `~/.config/hypr/hyprland.lua`, or to
+**The quick way.** Click the eye in your bar. If the layer rule is missing, the
+dropdown shows a warning with a **Load the layer rule** button. Press it: it backs
+up `~/.config/hypr/hyprland.lua`, appends the guarded loader below, and runs
+`hyprctl reload`. The warning then clears itself - the plugin re-reads the marker
+`hypr.lua` writes, so it confirms the rule really loaded rather than assuming the
+write worked.
+
+**By hand**, if you would rather nothing wrote to your compositor config: add this
+to the personal section of `~/.config/hypr/hyprland.lua`, or to
 `~/.config/hypr/autostart.lua`:
 
 ```lua
@@ -75,12 +83,12 @@ end
 Then `hyprctl reload`.
 
 **Without this snippet your audience sees the red border burned into every monitor
-share.** The layer rule it loads is what keeps the border out of captures, and layer
-rules are compositor config - a plugin installer cannot write them for you.
+share.** The layer rule it loads is what keeps the border out of captures.
 
 Keep the `io.open` guard and the `pcall`. A bare `dofile` breaks your *entire*
 Hyprland config the moment the file goes missing, which is exactly what happens when
-you uninstall the plugin.
+you uninstall the plugin. The button always emits the guarded form; hand-copying is
+the one path where that guard goes missing, which is why the button exists.
 
 ## Uninstall
 

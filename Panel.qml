@@ -231,10 +231,12 @@ Panel {
     ? "Your audience can see this border"
     : "This border is not hidden from monitor captures"
 
-  readonly property string layerRuleBody: (root.borderLeakingNow
-    ? "The Hyprland layer rule that keeps this border out of monitor captures is not loaded, so anyone watching a monitor share right now sees it burned into their stream. "
-    : "The Hyprland layer rule that keeps this border out of monitor captures is not loaded. Share a monitor or a region and your audience will see it burned into their stream. ")
-    + "Add the guarded snippet from the README's \"Then do this - it is not optional\" install step to ~/.config/hypr/hyprland.lua (or autostart.lua), then hyprctl reload."
+  // The headline already gives the diagnosis, so the body only has to say what
+  // it costs; the button below says how to end it. That is what let this drop
+  // from ~330 characters of README directions to one line.
+  readonly property string layerRuleBody: root.borderLeakingNow
+    ? "A monitor share is carrying it into their stream right now."
+    : "Share a monitor or region and your audience will see it."
 
   // ------------------------------------------------------------ cursor fix
 
@@ -244,6 +246,16 @@ Panel {
   // It covers a drawn border (real session or preview) and a live capture with no
   // border, which is what either border toggle produces.
   readonly property bool sharingActive: svc ? svc.portalRestartUnsafe === true : false
+  readonly property bool layerRuleFixBusy: svc ? svc.layerRuleFixBusy === true : false
+  readonly property bool layerRuleFixShown: root.layerRuleWarningShown
+    && svc && svc.layerRuleFixAvailable === true
+  readonly property bool layerRuleFixEnabled: !root.layerRuleFixBusy
+
+  function fixLayerRuleNow() {
+    if (!root.layerRuleFixEnabled) return
+    if (svc && typeof svc.applyLayerRuleFix === "function") svc.applyLayerRuleFix()
+  }
+
   readonly property bool cursorFixBusy: svc ? svc.cursorFixBusy === true : false
   readonly property bool cursorFixEnabled: !root.sharingActive && !root.cursorFixBusy
 
@@ -264,7 +276,38 @@ Panel {
   // 0-3 the four toggles; 4 the swatch row; 5 the width control; 6 preview;
   // 7 the cursor fix button -- only while that section is actually shown,
   // so a keyboard user can never land the cursor on a row that isn't there.
-  readonly property int rowCount: root.cursorFixShown ? 8 : 7
+  // The ordering array is the single source of truth for keyboard navigation.
+  // Conditional rows drop out of it entirely rather than leaving a hole, so
+  // nothing downstream has to know that an index shifted. That matters now that
+  // a conditional row sits at the *top*: with numeric literals, "index 3" would
+  // have meant Notifications with the layer-rule warning hidden and Monitor
+  // borders with it showing. Rows are compared by identity instead.
+  readonly property var cursorRows: {
+    var out = []
+    if (root.layerRuleFixShown) out.push(fixLayerRuleButton)
+    out.push(toggleActiveRow, toggleWindowBordersRow, toggleMonitorBordersRow,
+             toggleNotifyRow, colorRow, widthRow, previewButton)
+    if (root.cursorFixShown) out.push(fixCursorButton)
+    return out
+  }
+
+  readonly property int rowCount: root.cursorRows.length
+
+  // Deliberately not gated on cursorActive: moveCursor and activateCursor need
+  // the row under the cursor even on the keystroke that first activates it.
+  // The hasCursor bindings add the cursorActive check themselves.
+  readonly property var cursorAt: (root.cursorIndex >= 0 && root.cursorIndex < root.cursorRows.length)
+    ? root.cursorRows[root.cursorIndex] : null
+
+  function indexOfRow(item) {
+    var i = root.cursorRows.indexOf(item)
+    return i < 0 ? root.cursorIndex : i
+  }
+
+  function focusRow(item) {
+    root.cursorActive = true
+    root.cursorIndex = root.indexOfRow(item)
+  }
 
   function clampCursor() {
     if (cursorIndex >= rowCount) cursorIndex = Math.max(0, rowCount - 1)
@@ -281,20 +324,22 @@ Panel {
     // Left/Right on the swatch or width row is a fast path; Enter alone
     // (activateCursor below) already reaches every value.
     if (dx === 0) return
-    if (cursorIndex === 4) stepColorOption(dx > 0 ? 1 : -1)
-    else if (cursorIndex === 5) stepWidth(dx > 0 ? 1 : -1)
+    if (cursorAt === colorRow) stepColorOption(dx > 0 ? 1 : -1)
+    else if (cursorAt === widthRow) stepWidth(dx > 0 ? 1 : -1)
   }
 
   function activateCursor() {
     clampCursor()
-    if (cursorIndex === 0) toggleActive()
-    else if (cursorIndex === 1) toggleWindowBorders()
-    else if (cursorIndex === 2) toggleMonitorBorders()
-    else if (cursorIndex === 3) toggleNotify()
-    else if (cursorIndex === 4) stepColorOption(1)
-    else if (cursorIndex === 5) stepWidth(1)
-    else if (cursorIndex === 6) previewNow()
-    else if (cursorIndex === 7) fixCursorNow()
+    var row = root.cursorAt
+    if (row === toggleActiveRow) toggleActive()
+    else if (row === toggleWindowBordersRow) toggleWindowBorders()
+    else if (row === toggleMonitorBordersRow) toggleMonitorBorders()
+    else if (row === toggleNotifyRow) toggleNotify()
+    else if (row === colorRow) stepColorOption(1)
+    else if (row === widthRow) stepWidth(1)
+    else if (row === previewButton) previewNow()
+    else if (row === fixCursorButton) fixCursorNow()
+    else if (row === fixLayerRuleButton) fixLayerRuleNow()
   }
 
   // Shared by activateCursor() and each row's onClicked, so mouse and keyboard
@@ -321,9 +366,7 @@ Panel {
   }
 
   function scrollCursorIntoView() {
-    var rows = [toggleActiveRow, toggleWindowBordersRow, toggleMonitorBordersRow, toggleNotifyRow,
-                colorRow, widthRow, previewButton, fixCursorButton]
-    scrollItemIntoView(rows[cursorIndex])
+    scrollItemIntoView(root.cursorAt)
   }
 
   // ------------------------------------------------------------ row model
@@ -522,6 +565,37 @@ Panel {
               width: parent.width
             }
 
+            // Says what the button will do before it is pressed, for the same
+            // reason the cursor fix does: this writes the user's compositor
+            // config, and a keyboard user driving it never triggers a hover.
+            Text {
+              visible: root.layerRuleFixShown
+              textFormat: Text.PlainText
+              text: "Adds a guarded loader to ~/.config/hypr/hyprland.lua and reloads Hyprland."
+              color: Qt.darker(root.foreground, 1.5)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+              width: parent.width
+            }
+
+            Button {
+              id: fixLayerRuleButton
+              visible: root.layerRuleFixShown
+              width: parent.width
+              text: root.layerRuleFixBusy ? "Loading…" : "Load the layer rule"
+              bordered: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              enabled: root.layerRuleFixEnabled
+              opacity: enabled ? 1.0 : 0.6
+              hasCursor: root.cursorActive && root.cursorAt === fixLayerRuleButton
+              onClicked: root.fixLayerRuleNow()
+              onHovered: function(isHovered) {
+                if (isHovered) root.focusRow(fixLayerRuleButton)
+              }
+            }
+
             PanelSeparator {
               foreground: root.foreground
             }
@@ -614,10 +688,10 @@ Panel {
               checked: root.activeSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
-              hasCursor: root.cursorActive && root.cursorIndex === 0
+              hasCursor: root.cursorActive && root.cursorAt === toggleActiveRow
               onClicked: root.toggleActive()
               onHovered: function(isHovered) {
-                if (isHovered) { root.cursorActive = true; root.cursorIndex = 0 }
+                if (isHovered) root.focusRow(toggleActiveRow)
               }
             }
 
@@ -629,10 +703,10 @@ Panel {
               checked: root.windowBordersSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
-              hasCursor: root.cursorActive && root.cursorIndex === 1
+              hasCursor: root.cursorActive && root.cursorAt === toggleWindowBordersRow
               onClicked: root.toggleWindowBorders()
               onHovered: function(isHovered) {
-                if (isHovered) { root.cursorActive = true; root.cursorIndex = 1 }
+                if (isHovered) root.focusRow(toggleWindowBordersRow)
               }
             }
 
@@ -644,10 +718,10 @@ Panel {
               checked: root.monitorBordersSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
-              hasCursor: root.cursorActive && root.cursorIndex === 2
+              hasCursor: root.cursorActive && root.cursorAt === toggleMonitorBordersRow
               onClicked: root.toggleMonitorBorders()
               onHovered: function(isHovered) {
-                if (isHovered) { root.cursorActive = true; root.cursorIndex = 2 }
+                if (isHovered) root.focusRow(toggleMonitorBordersRow)
               }
             }
 
@@ -659,10 +733,10 @@ Panel {
               checked: root.notifySetting
               foreground: root.foreground
               fontFamily: root.fontFamily
-              hasCursor: root.cursorActive && root.cursorIndex === 3
+              hasCursor: root.cursorActive && root.cursorAt === toggleNotifyRow
               onClicked: root.toggleNotify()
               onHovered: function(isHovered) {
-                if (isHovered) { root.cursorActive = true; root.cursorIndex = 3 }
+                if (isHovered) root.focusRow(toggleNotifyRow)
               }
             }
           }
@@ -688,11 +762,11 @@ Panel {
               radius: Style.cornerRadius
               foreground: root.foreground
               accent: Color.accent
-              hasCursor: root.cursorActive && root.cursorIndex === 4
+              hasCursor: root.cursorActive && root.cursorAt === colorRow
               implicitHeight: colorContent.implicitHeight + Style.spacing.huge
 
               HoverHandler {
-                onHoveredChanged: if (hovered) { root.cursorActive = true; root.cursorIndex = 4 }
+                onHoveredChanged: if (hovered) root.focusRow(colorRow)
               }
 
               Column {
@@ -778,11 +852,11 @@ Panel {
               radius: Style.cornerRadius
               foreground: root.foreground
               accent: Color.accent
-              hasCursor: root.cursorActive && root.cursorIndex === 5
+              hasCursor: root.cursorActive && root.cursorAt === widthRow
               implicitHeight: widthContent.implicitHeight + Style.spacing.huge
 
               HoverHandler {
-                onHoveredChanged: if (hovered) { root.cursorActive = true; root.cursorIndex = 5 }
+                onHoveredChanged: if (hovered) root.focusRow(widthRow)
               }
 
               RowLayout {
@@ -856,10 +930,10 @@ Panel {
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
-              hasCursor: root.cursorActive && root.cursorIndex === 6
+              hasCursor: root.cursorActive && root.cursorAt === previewButton
               onClicked: root.previewNow()
               onHovered: function(isHovered) {
-                if (isHovered) { root.cursorActive = true; root.cursorIndex = 6 }
+                if (isHovered) root.focusRow(previewButton)
               }
             }
 
@@ -914,10 +988,10 @@ Panel {
                 fontFamily: root.fontFamily
                 enabled: root.cursorFixEnabled
                 opacity: enabled ? 1.0 : 0.6
-                hasCursor: root.cursorActive && root.cursorIndex === 7
+                hasCursor: root.cursorActive && root.cursorAt === fixCursorButton
                 onClicked: root.fixCursorNow()
                 onHovered: function(isHovered) {
-                  if (isHovered) { root.cursorActive = true; root.cursorIndex = 7 }
+                  if (isHovered) root.focusRow(fixCursorButton)
                 }
               }
 

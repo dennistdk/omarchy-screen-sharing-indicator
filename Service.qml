@@ -654,6 +654,125 @@ Item {
     return home ? home + "/.config/hypr/xdph.conf" : ""
   }
 
+  // ------------------------------------------------------- layer rule fix
+
+  // The plugin's own install directory, handed over by shell.qml's
+  // ensureService along with the rest of the manifest. Read rather than
+  // constructed: the folder is named by the manifest id, so anything built
+  // from a hardcoded string breaks the moment that id changes -- which it
+  // just did.
+  readonly property string pluginDir: root.manifest && root.manifest.__sourceDir
+    ? String(root.manifest.__sourceDir) : ""
+
+  readonly property string hyprlandLuaPath: {
+    var home = Quickshell.env("HOME")
+    return home ? home + "/.config/hypr/hyprland.lua" : ""
+  }
+
+  property bool layerRuleFixBusy: false
+
+  // Whether the button has anything to offer: a missing rule this knows how to
+  // write. Unlike the cursor fix there is no sharing gate -- `hyprctl reload`
+  // re-reads config, it does not restart the portal, so it cannot drop a live
+  // capture the way that one can.
+  readonly property bool layerRuleFixAvailable: root.layerRuleCheckState === "missing"
+    && root.pluginDir !== "" && root.hyprlandLuaPath !== ""
+
+  // Mirrors applyCursorFix: read the file, compute the new contents through a
+  // pure function, then back up, write and reload in one script. Verification
+  // is free -- hypr.lua rewrites the marker file this service already watches,
+  // so a successful reload flips layerRuleCheckState to "ok" and the warning
+  // dismisses itself. Nothing new has to confirm the write worked.
+  function applyLayerRuleFix() {
+    if (root.layerRuleFixBusy) return "refused: busy"
+    if (!root.pluginDir) return "refused: no plugin dir"
+    if (!root.hyprlandLuaPath) return "refused: no home"
+
+    root.layerRuleFixBusy = true
+    logEvent("layer-rule-fix", "start")
+    layerRuleFixReader.running = false
+    layerRuleFixReader.command = ["sh", "-c", 'cat "$1" 2>/dev/null', "sh", root.hyprlandLuaPath]
+    layerRuleFixReader.running = true
+    return "ok"
+  }
+
+  function onLayerRuleFixContentRead(text) {
+    var content = String(text === undefined || text === null ? "" : text)
+    var next
+    try {
+      next = ShareModel.applyLayerRuleSnippet(content, root.pluginDir)
+    } catch (e) {
+      console.warn("screen-sharing-indicator: layer rule fix failed to compute the new file: " + e)
+      logEvent("layer-rule-fix", "aborted: " + e)
+      root.layerRuleFixBusy = false
+      return
+    }
+
+    // null is "nothing to do", not failure: the loader is already there, or the
+    // path cannot be quoted safely. Either way the file is left untouched, and
+    // a reload is still worth running -- an already-present snippet that never
+    // loaded is exactly the state the warning is complaining about.
+    if (next === null) {
+      logEvent("layer-rule-fix", "already present or unquotable path; reloading without writing")
+      layerRuleFixWriter.running = false
+      layerRuleFixWriter.command = ["sh", "-c",
+        'echo WRITE_SKIPPED=1; hyprctl reload 2>&1; ' +
+        'if [ "$?" -ne 0 ]; then echo RELOAD_FAILED=1; else echo RELOAD_FAILED=0; fi']
+      layerRuleFixWriter.running = true
+      return
+    }
+
+    // One script so backup, write and reload happen in that order with no
+    // window for this service to be killed between them. A failed backup exits
+    // before hyprland.lua is touched: this is the user's whole compositor
+    // config, and failing loud beats skipping the one safety net.
+    layerRuleFixWriter.running = false
+    layerRuleFixWriter.command = ["sh", "-c",
+      'p="$1"; c="$2"; ' +
+      'if [ -f "$p" ]; then cp -p "$p" "$p.bak.$(date +%s)" || { echo BACKUP_FAILED=1; exit 0; }; fi; ' +
+      'printf "%s" "$c" > "$p" || { echo WRITE_FAILED=1; exit 0; }; ' +
+      'echo WRITE_FAILED=0; ' +
+      'hyprctl reload 2>&1; ' +
+      'if [ "$?" -ne 0 ]; then echo RELOAD_FAILED=1; else echo RELOAD_FAILED=0; fi',
+      "sh", root.hyprlandLuaPath, next]
+    layerRuleFixWriter.running = true
+  }
+
+  function onLayerRuleFixWritten(text) {
+    var out = String(text === undefined || text === null ? "" : text)
+    root.layerRuleFixBusy = false
+    if (/BACKUP_FAILED=1/.test(out)) logEvent("layer-rule-fix", "aborted: could not back up hyprland.lua; nothing written")
+    else if (/WRITE_FAILED=1/.test(out)) logEvent("layer-rule-fix", "backed up but failed to write hyprland.lua; not reloaded")
+    else if (/RELOAD_FAILED=1/.test(out)) logEvent("layer-rule-fix", "wrote hyprland.lua but hyprctl reload failed: " + truncate(out))
+    else if (/WRITE_SKIPPED=1/.test(out)) logEvent("layer-rule-fix", "loader already present; reloaded")
+    else logEvent("layer-rule-fix", "wrote hyprland.lua and reloaded Hyprland")
+    // hypr.lua rewrites the marker on reload, so re-checking is what turns a
+    // successful write into a green readout. A successful `hyprctl reload` also
+    // emits configreloaded, which calls this too -- the duplicate is harmless
+    // (it restarts one settle timer). It is here for the paths where that event
+    // never arrives: a failed backup, a failed write, a failed reload. Those
+    // must land on an honest still-missing rather than a stale hope.
+    root.startLayerRuleCheck()
+  }
+
+  Process {
+    id: layerRuleFixReader
+    running: false
+    stdout: StdioCollector {
+      id: layerRuleFixReaderOut
+      onStreamFinished: root.onLayerRuleFixContentRead(text)
+    }
+  }
+
+  Process {
+    id: layerRuleFixWriter
+    running: false
+    stdout: StdioCollector {
+      id: layerRuleFixWriterOut
+      onStreamFinished: root.onLayerRuleFixWritten(text)
+    }
+  }
+
   property bool cursorFileExists: false
   property var cursorMode: null
   property double cursorFileMtimeMs: 0
@@ -1435,6 +1554,14 @@ Item {
     // live share. See applyCursorFix() for the gate and the write.
     function fixCursor(): string {
       return root.applyCursorFix()
+    }
+
+    // Appends the guarded loader to hyprland.lua and reloads Hyprland. No
+    // sharing gate: `hyprctl reload` re-reads config rather than restarting the
+    // portal, so unlike fixCursor it cannot drop a live capture. See
+    // applyLayerRuleFix() for the backup and the write.
+    function fixLayerRule(): string {
+      return root.applyLayerRuleFix()
     }
 
     // Diagnostic for the two monitor-resolution paths: collectWindowRows builds

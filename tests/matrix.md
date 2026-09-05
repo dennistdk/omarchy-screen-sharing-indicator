@@ -378,3 +378,39 @@ journalctl --user | grep screen-sharing-indicator
 and nothing else. For a transient that is gone before you can type, `tests/record`
 samples the model and the compositor together twice a second and writes both to a
 file.
+
+### M22 - the layer rule fix button
+
+The one action that writes to the user's compositor config, so it is the one
+that most needs a live row. Verification is not a separate step: `hypr.lua`
+rewrites its marker on every reload, and the service re-reads that marker, so
+a warning that clears itself *is* the proof the rule loaded.
+
+- **Do:** with the loader absent from `~/.config/hypr/hyprland.lua`, open the
+  dropdown. Press **Load the layer rule**.
+- **Expect:** the warning disappears within a second or two. `hyprland.lua`
+  gains the guarded `do ... end` block with the plugin's real install path, and
+  a sibling `hyprland.lua.bak.<epoch>` appears next to it. The journal logs
+  `layer-rule-fix: wrote hyprland.lua and reloaded Hyprland`.
+- **Check:** `hyprctl layers | grep -c io.github` is unchanged (the rule governs
+  capture, not mapping); start a monitor share and confirm a `grim` capture shows
+  black strips rather than red. That is the audience-side proof - see
+  [`captures.md`](captures.md).
+
+- **Do:** press it a second time (temporarily force the warning by commenting the
+  block out, then reload).
+- **Expect:** no duplicate block. `applyLayerRuleSnippet` returns null for a
+  config that already loads it, so the service reloads without writing, and the
+  journal says `loader already present; reloaded`. A *commented-out* block reads
+  as absent, so this path appends one - matching how `cursor_mode` is judged.
+
+- **Do:** make `hyprland.lua` read-only (`chmod 444`) and press the button.
+- **Expect:** nothing is written and Hyprland is not reloaded. The journal says
+  `backed up but failed to write hyprland.lua; not reloaded`, and the warning
+  stays up rather than flipping to a green readout it has not earned.
+
+- **Do:** arrow-key down from the top of the dropdown while the warning shows.
+- **Expect:** the fix button is the **first** row, ahead of `Enabled`, and every
+  row below it still activates its own control. With the warning hidden, the
+  first row is `Enabled` again. The row model is identity-based precisely so
+  this conditional top row cannot shift the meaning of the ones under it.
