@@ -515,7 +515,7 @@ Panel {
           PanelHero {
             id: hero
             width: parent.width
-            title: "Screen Sharing"
+            title: "Screen Sharing Indicator"
             meta: root.heroMeta
             foreground: root.foreground
             fontFamily: root.fontFamily
