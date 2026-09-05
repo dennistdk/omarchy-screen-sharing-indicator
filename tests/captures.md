@@ -1,9 +1,9 @@
 # What a capture actually contains
 
-The dangerous failure in this plugin is not "no ring". It is a ring that reaches
+The dangerous failure in this plugin is not "no border". It is a border that reaches
 the audience - either as red leaking into their stream, or as a blackout of it.
 This file records what has actually been measured on real captures, and it is
-why the ring is four thin strips rather than one full-output overlay.
+why the border is four thin strips rather than one full-output overlay.
 
 The presenter-facing rows of the manual matrix live in
 [`matrix.md`](matrix.md); this file is the audience's side, in numbers.
@@ -12,7 +12,7 @@ The presenter-facing rows of the manual matrix live in
 
 `grim` goes through the same `ScreenshareManager` path Teams or OBS does - it
 emits `screencast` / `screencastv2` on socket2 like any other client - so a
-`grim` capture taken while the ring is mapped *is* the audience's view. That
+`grim` capture taken while the border is mapped *is* the audience's view. That
 makes the audience side measurable without a portal client.
 
 **One trap makes naive runs misleading.** A `grim` session lives about 500 ms,
@@ -34,20 +34,20 @@ Environment for these figures: Omarchy 4.0.2, Hyprland 0.56.2, Quickshell 0.3.1,
 
 | Setup | Result |
 | --- | --- |
-| One full-output surface in this namespace, rule applied | **8,294,400 px black** - the entire 3840x2160 frame. The fill covers the bounding box, not the ink. This is what a full-output overlay would cost the audience, and the reason the ring is four strips. |
+| One full-output surface in this namespace, rule applied | **8,294,400 px black** - the entire 3840x2160 frame. The fill covers the bounding box, not the ink. This is what a full-output overlay would cost the audience, and the reason the border is four strips. |
 | One strip surface, rule applied | **75,000 px black** over the strip region only; screen centre `srgb(35,43,46)`, a normal desktop. No blackout. |
 | The same strip, rule removed | **75,000 px of `srgb(232,17,35)`** - exactly `#E81123`. The rule is the only thing preventing this. |
-| A window share, seen from a **window** capture | No ring and no black frame. Window captures never include layer-shell surfaces. Field-confirmed across a 13m45s Teams window share with no artifact reported by any participant - and a red leak or a blackout would have been unmissable. |
+| A window share, seen from a **window** capture | No border and no black frame. Window captures never include layer-shell surfaces. Field-confirmed across a 13m45s Teams window share with no artifact reported by any participant - and a red leak or a blackout would have been unmissable. |
 | A window share, seen from a concurrent **monitor** capture | The one case that needs two portal clients at once, so it is a manual row rather than a measurement here: see M11 in [`matrix.md`](matrix.md). |
 
 `hyprctl reload` with the plugin's `hypr.lua` deleted returns `ok`, so the
 guarded `dofile` in the user's config survives an uninstall rather than breaking
 the whole Hyprland config.
 
-## The ring is not quite invisible: 8 px at the bottom corners
+## The border is not quite invisible: 8 px at the bottom corners
 
-A single pinned strip shows no ring colour at all. A whole four-strip monitor
-ring does leak, by exactly 8 physical pixels:
+A single pinned strip shows no border colour at all. A whole four-strip monitor
+border does leak, by exactly 8 physical pixels:
 
 ```
 4x1+0+2155      bottom-left
@@ -74,7 +74,7 @@ then end on integer physical rows (0 and 2160) and the slivers disappear. It
 means deliberately double-drawing the corners, and re-running everything on this
 page.
 
-`tests/audience` therefore allows 500 px of ring colour rather than requiring
+`tests/audience` therefore allows 500 px of border colour rather than requiring
 zero. The discrimination is not delicate: a single unruled strip measures
 75,000 px.
 
@@ -98,7 +98,7 @@ Still thin - 6 rows out of 2160 - but the documentation should not promise 3.
 
 ## Geometry, measured
 
-A monitor ring on `DP-1`, from `hyprctl layers`:
+A monitor border on `DP-1`, from `hyprctl layers`:
 
 ```
 x=0    y=0     w=3072 h=3
@@ -113,7 +113,7 @@ coordinate space with `PanelWindow` margins. Mixing them overflows every monitor
 strip.
 
 Sharing the second output puts the strips at global `x=3072..6141`, so the
-output-local conversion holds off-origin rather than pinning every ring to the
+output-local conversion holds off-origin rather than pinning every border to the
 first monitor's corner.
 
 ## Timing, measured
@@ -121,7 +121,7 @@ first monitor's corner.
 `grim` start to stop, twice: `06.108 -> 06.608` and `11.130 -> 11.630`. Exactly
 500 ms, and torn down by Hyprland's idle-stop timer rather than by the client
 disconnecting. That is the case the 700 ms default debounce exists for; anything
-at or below 500 ms flashes a ring on every screenshot.
+at or below 500 ms flashes a border on every screenshot.
 
 With the default in place, a `grim` capture arms a timer, cancels it, and maps
 zero strips.

@@ -10,27 +10,27 @@ Initial release.
 
 ### Added
 
-- Presenter-visible red ring around the window, monitor or region currently
+- Presenter-visible red border around the window, monitor or region currently
   being captured through the desktop portal. Drawn as four thin layer-shell
   strips so that Hyprland's `no_screen_share` bounding-box fill costs a monitor
   share's audience a thin black edge rather than the whole frame.
-- `hypr.lua`, the layer rule that keeps the ring out of monitor captures,
+- `hypr.lua`, the layer rule that keeps the border out of monitor captures,
   loaded from the user's Hyprland config through a guarded `dofile`.
 - Window matching by exact title, with the matched addresses frozen on the
-  start event so a mid-share retitle cannot break the ring. Duplicate titles
-  ring every window that answers to them.
+  start event so a mid-share retitle cannot break the border. Duplicate titles
+  border every window that answers to them.
 - A start debounce (`debounceMs`, default 700) so screenshots do not flash the
-  ring, and a stop grace (`stopGraceMs`, default 1500) so Hyprland's 500 ms
+  border, and a stop grace (`stopGraceMs`, default 1500) so Hyprland's 500 ms
   idle-stop does not make a still screen flicker.
 - Bar widget: an always-visible eye that reports whether something is being
   captured, read from the session table rather than from the strip count.
 - Widget dropdown: live session list, four toggles, six colour swatches plus an
-  `auto` contrast mode, a ring-width stepper, and a three-second preview ring.
+  `auto` contrast mode, a border-width stepper, and a three-second preview border.
 - Health checks in the dropdown for the layer rule and for `cursor_mode` in
   `xdph.conf`, the latter with a one-click fix that refuses while a share is
   running.
 - Optional desktop notifications when a share starts and stops (`notify`, off
-  by default). Settings changes and preview rings never fire one.
+  by default). Settings changes and preview borders never fire one.
 - `omarchy-shell screen-sharing-indicator status` for the session table, the
   matched window addresses and the strip count, as JSON.
 - Unit tests over the pure model (`tests/run`), plus a manual matrix
@@ -39,12 +39,12 @@ Initial release.
 
 ### Known limitations
 
-- Restarting the shell mid-share loses the ring until the next share starts.
+- Restarting the shell mid-share loses the border until the next share starts.
   Hyprland has no query for what is currently being captured.
-- Region shares ring the whole monitor. The wire protocol carries no rectangle.
-- Sharing a browser tab rings the whole browser window.
+- Region shares border the whole monitor. The wire protocol carries no rectangle.
+- Sharing a browser tab draws a border around the whole browser window.
 - A monitor share's audience sees a thin black edge, roughly twice `widthPx` in
-  physical pixels, and 8 physical pixels of ring colour at the bottom corners
+  physical pixels, and 8 physical pixels of border colour at the bottom corners
   on a fractionally scaled output. Both are measured in `tests/captures.md`.
 
 [1.0.0]: https://github.com/dennistdk/omarchy-screen-sharing-indicator/releases/tag/v1.0.0

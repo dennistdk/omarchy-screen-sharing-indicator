@@ -276,7 +276,7 @@ test("state transitions do not mutate the state handed in", () => {
 // Hyprland ends a capture session after 500 ms with no copied frame and emits
 // the same screencastv2>>0 a real "stop sharing" emits. Taking that at face
 // value tears down live shares: on a still screen the 700 ms debounce is
-// cancelled every cycle and the ring never appears at all.
+// cancelled every cycle and the border never appears at all.
 
 function visibleWindowSession(nowMs = 0) {
   const key = M.sessionKey("window", "Teams")
@@ -294,7 +294,7 @@ test("an idle stop holds the session instead of tearing it down", () => {
 
   assert.deepEqual(r.graceKeys, [key])
   assert.deepEqual(r.dropped, [], "nothing may unmap while the grace runs")
-  assert.equal(r.state.visible[key], true, "the ring stays up")
+  assert.equal(r.state.visible[key], true, "the border stays up")
   assert.deepEqual(r.state.sessions[key].stripIds, strips, "same surfaces, no remap")
   assert.equal(r.state.sessions[key].stoppingAt, 800 + GRACE)
 })
@@ -318,7 +318,7 @@ test("a restart inside the grace revives the session untouched", () => {
   assert.equal(r.state.visible[key], true)
 })
 
-test("the 500 ms churn lets a ring appear on a screen that never changes", () => {
+test("the 500 ms churn lets a border appear on a screen that never changes", () => {
   // Journal: start 05.640, stop 06.140, start 06.640. Each session lives
   // exactly 500 ms, so the 700 ms deadline has to survive the gap.
   const key = M.sessionKey("monitor", "DP-2")
@@ -332,7 +332,7 @@ test("the 500 ms churn lets a ring appear on a screen that never changes", () =>
 
   r = start(state, "monitor", "DP-2", 6640)
   state = M.fireDue(r.state, 6640)
-  assert.equal(state.visible[key], true, "the ring appears one churn cycle late, not never")
+  assert.equal(state.visible[key], true, "the border appears one churn cycle late, not never")
 })
 
 test("a grace that runs out drops the session and reports its strips", () => {
@@ -426,7 +426,7 @@ test("a stop with another client still attached starts no grace", () => {
 //   12:37:11 stop  window "(2) YouTube - Brave"
 //
 // The stop was dropped, the session stayed pinned at count=1 and VISIBLE, and
-// the ring sat on a window that had not been shared for four hours. So a stop
+// the border sat on a window that had not been shared for four hours. So a stop
 // is resolved by address first and by title only as a fallback.
 
 const REAP = 5000
@@ -451,7 +451,7 @@ test("a stop under a new title still tears down the session it belongs to", () =
 
 test("a stop resolves to the session holding the address, not one sharing the name", () => {
   // Worse than a lost stop: a stray stop landing on a live share and taking
-  // its ring down. The address decides, so it cannot.
+  // its border down. The address decides, so it cannot.
   const kept = M.sessionKey("window", "Foo")
   const meant = M.sessionKey("window", "Bar")
   let r = start(M.emptyState(), "window", "Foo", 0)
@@ -515,7 +515,7 @@ test("a window that comes back before the reaper is not collected", () => {
 })
 
 test("a session that never matched a window is never reaped", () => {
-  // A start whose title matches nothing draws no ring and may still be
+  // A start whose title matches nothing draws no border and may still be
   // recovered by a later retitle. Only a session that *lost* a window is dead.
   const r = start(M.emptyState(), "window", "unmatched", 0)
   assert.equal(r.state.sessions[M.sessionKey("window", "unmatched")].addressLessSince, 0)
@@ -541,7 +541,7 @@ test("nextReapDeadline reports the soonest collection, or -1", () => {
 // more. A session therefore remembers every title its window has worn.
 //
 // Observed: a call ended, the stop resolved to nothing, the session stayed
-// pinned with the ring up, and only killing the browser cleared it (the reaper
+// pinned with the border up, and only killing the browser cleared it (the reaper
 // will not collect a session whose window is still alive).
 
 test("a stop under a title the window has already left still finds its session", () => {
@@ -622,7 +622,7 @@ const TOPLEVELS = [
   { address: "0xCC", title: "Something else", lastIpcObject: { address: "0xCC", title: "Something else", monitor: 0, workspace: { id: 1 }, mapped: true } }
 ]
 
-test("matchWindows rings every window sharing the title", () => {
+test("matchWindows matches every window sharing the title", () => {
   const hits = M.matchWindows(TOPLEVELS, "Teams", [])
   assert.deepEqual(hits.map((t) => t.address), ["0xAA", "0xBB"])
 })
@@ -634,7 +634,7 @@ test("matchWindows is exact, not substring or case-folded", () => {
 })
 
 test("matchWindows sticks to stored addresses and ignores the title", () => {
-  // The title has already changed by the time the ring maps: it must not matter.
+  // The title has already changed by the time the border maps: it must not matter.
   const renamed = TOPLEVELS.map((t) => ({ ...t, title: "Chat with someone | Microsoft Teams" }))
   const hits = M.matchWindows(renamed, "Teams", ["aa"])
   assert.deepEqual(hits.map((t) => t.address), ["0xAA"])
@@ -695,12 +695,12 @@ test("monitorForWindow resolves by IPC id, the same way the geometry path does",
   const onHdmi = { address: "0xAA", lastIpcObject: { address: "0xAA", monitor: 1, workspace: { id: 4 }, mapped: true } }
   const offWs = { address: "0xBB", lastIpcObject: { address: "0xBB", monitor: 1, workspace: { id: 9 }, mapped: true } }
   assert.equal(M.isWindowDrawable(onHdmi, monitors), true)
-  assert.equal(M.isWindowDrawable(offWs, monitors), false, "off-workspace withdraws the ring")
+  assert.equal(M.isWindowDrawable(offWs, monitors), false, "off-workspace withdraws the border")
 })
 
 // ------------------------------------------------------------------ geometry
 
-test("boxesForMonitor rings a logical 3072x1728 output, not a 3840x2160 buffer", () => {
+test("boxesForMonitor spans a logical 3072x1728 output, not a 3840x2160 buffer", () => {
   const boxes = M.boxesForMonitor(3072, 1728, 3)
   assert.deepEqual(boxes, [
     { edge: "t", boxX: 0, boxY: 0, boxW: 3072, boxH: 3 },
@@ -715,7 +715,7 @@ test("boxesForMonitor rings a logical 3072x1728 output, not a 3840x2160 buffer",
   }
 })
 
-test("boxesForWindow rings an interior rectangle", () => {
+test("boxesForWindow outlines an interior rectangle", () => {
   assert.deepEqual(M.boxesForWindow(12, 42, 1517, 830, 3), [
     { edge: "t", boxX: 12, boxY: 42, boxW: 1517, boxH: 3 },
     { edge: "b", boxX: 12, boxY: 869, boxW: 1517, boxH: 3 },
@@ -745,14 +745,14 @@ test("widthPx is clamped to a sane, thin residual", () => {
 })
 
 // Both of the following pin measured geometry rather than drive a design. The
-// ring is flush with the client area by construction; these lock that in, so a
+// border is flush with the client area by construction; these lock that in, so a
 // change to the box arithmetic cannot quietly move it by a pixel.
 
-test("a window ring's outer edges land exactly on the client area", () => {
+test("a window border's outer edges land exactly on the client area", () => {
   // at=[12,42] size=[1517,1674]: a real tiled window on DP-1 at scale 1.25.
   // `at` is the client area, not the visible edge -- 12 is gaps_out 10 plus
-  // border 2 -- so Hyprland's border sits outside the ring rather than under
-  // it, and the ring hugs exactly the region a window capture would copy.
+  // border 2 -- so Hyprland's border sits outside the border rather than under
+  // it, and the border hugs exactly the region a window capture would copy.
   const b = {}
   for (const box of M.boxesForWindow(12, 42, 1517, 1674, 3)) b[box.edge] = box
 
@@ -798,14 +798,14 @@ test("no window geometry, however degenerate, emits a box the compositor drops",
 // out at x = 0, 3072, 6144. Monitor width is buffer pixels; the layout origins
 // and every window's at/size are logical. Mixing the two is the geometry bug
 // that only shows up on a fractionally scaled output.
-test("a window ring is output-local, not desktop-global", () => {
+test("a window border is output-local, not desktop-global", () => {
   const monitor = { name: "HDMI-A-1", x: 3072, y: 0, width: 3840, height: 2160, scale: 1.25 }
   const at = [3084, 886]
   const size = [3048, 830]
 
   const localX = at[0] - monitor.x
   const localY = at[1] - monitor.y
-  assert.equal(localX, 12, "subtracting the monitor origin is what keeps the ring on its own output")
+  assert.equal(localX, 12, "subtracting the monitor origin is what keeps the border on its own output")
 
   const boxes = M.boxesForWindow(localX, localY, size[0], size[1], 3)
   assert.deepEqual(boxes, [
@@ -815,13 +815,13 @@ test("a window ring is output-local, not desktop-global", () => {
     { edge: "r", boxX: 3057, boxY: 889, boxW: 3, boxH: 824 }
   ])
 
-  // Forgetting the subtraction pushes the ring off the right-hand edge of a
+  // Forgetting the subtraction pushes the border off the right-hand edge of a
   // 3072-wide output entirely.
   const wrong = M.boxesForWindow(at[0], at[1], size[0], size[1], 3)
   assert.ok(wrong[0].boxX + wrong[0].boxW > 3072, "the un-subtracted box must be detectably off-output")
 })
 
-test("a monitor ring built from buffer pixels overhangs a scaled output", () => {
+test("a monitor border built from buffer pixels overhangs a scaled output", () => {
   const logical = M.logicalOutputSize(3840, 2160, 1.25, 3072, 1728)
   assert.deepEqual(M.boxesForMonitor(logical.w, logical.h, 3)[0].boxW, 3072)
   // What the same call produces if HyprlandMonitor.width leaks in.
@@ -850,7 +850,7 @@ test("a Teams window share survives a retitle across the whole debounce", () => 
   const renamed = TOPLEVELS.map((t) => ({ ...t, title: "Weekly sync | Microsoft Teams" }))
   assert.deepEqual(M.matchWindows(renamed, "Teams", []), [], "title matching would now miss")
 
-  // The ring still maps, from the stored addresses.
+  // The border still maps, from the stored addresses.
   state = M.fireDue(state, 700)
   assert.equal(state.visible[key], true)
   const live = M.matchWindows(renamed, "Teams", state.sessions[key].addresses)
@@ -867,8 +867,8 @@ test("a screenshot flash and a real share can overlap without crossing", () => {
   r = stop(r.state, "monitor", "DP-1", 90)
 
   const state = M.fireDue(r.state, 750)
-  assert.equal(state.visible[grim], undefined, "the grim flash must not ring")
-  assert.equal(state.visible[teams], true, "the real share must still ring")
+  assert.equal(state.visible[grim], undefined, "the grim flash must not border")
+  assert.equal(state.visible[teams], true, "the real share must still border")
 })
 
 // ------------------------------------------------------------------ settings
@@ -912,22 +912,22 @@ test("mergedSettings overwrites what the caller does mention", () => {
 
 // ------------------------------------------------------------------- colour
 
-test("autoRingColor leaves the red alone on a blue-accented theme", () => {
-  assert.equal(M.autoRingColor("#E81123", "#3B82F6"), "#E81123")
+test("autoBorderColor leaves the red alone on a blue-accented theme", () => {
+  assert.equal(M.autoBorderColor("#E81123", "#3B82F6"), "#E81123")
 })
 
-test("autoRingColor leaves the red alone on a washed-out accent", () => {
-  // Saturation at or below 0.35 cannot compete with the ring, whatever its hue.
-  assert.equal(M.autoRingColor("#E81123", "#9C8080"), "#E81123")
+test("autoBorderColor leaves the red alone on a washed-out accent", () => {
+  // Saturation at or below 0.35 cannot compete with the border, whatever its hue.
+  assert.equal(M.autoBorderColor("#E81123", "#9C8080"), "#E81123")
 })
 
-test("autoRingColor moves the ring when the accent is also red", () => {
-  const out = M.autoRingColor("#E81123", "#E81123")
+test("autoBorderColor moves the border when the accent is also red", () => {
+  const out = M.autoBorderColor("#E81123", "#E81123")
   assert.notEqual(out, "#E81123")
   assert.match(out, /^#[0-9a-f]{6}$/i)
 })
 
-test("autoRingColor never leaves the red-to-orange alarm band", () => {
+test("autoBorderColor never leaves the red-to-orange alarm band", () => {
   // The hue is read back out of an 8-bit hex string, so the hslToHex/hexToHsl
   // round trip quantises it by a few hundredths of a degree -- #FF6A00 selects
   // endpoint 350 and reads back 349.953. Allow half a degree of slack at each
@@ -936,7 +936,7 @@ test("autoRingColor never leaves the red-to-orange alarm band", () => {
   // colour the function returns.
   const SLACK = 0.5
   for (const accent of ["#E81123", "#FF3B00", "#D40030", "#FF6A00"]) {
-    const hsl = M.hexToHsl(M.autoRingColor("#E81123", accent))
+    const hsl = M.hexToHsl(M.autoBorderColor("#E81123", accent))
     assert.ok(
       hsl.h >= M.ALARM_HUE_START - SLACK || hsl.h <= M.ALARM_HUE_END + SLACK,
       `hue ${hsl.h} left the alarm band for ${accent}`
@@ -944,13 +944,13 @@ test("autoRingColor never leaves the red-to-orange alarm band", () => {
   }
 })
 
-test("autoRingColor is idempotent for a given accent", () => {
-  const once = M.autoRingColor("#E81123", "#E81123")
-  assert.equal(M.autoRingColor(once, "#E81123"), once)
+test("autoBorderColor is idempotent for a given accent", () => {
+  const once = M.autoBorderColor("#E81123", "#E81123")
+  assert.equal(M.autoBorderColor(once, "#E81123"), once)
 })
 
-test("autoRingColor returns the base unchanged for unparseable input", () => {
-  assert.equal(M.autoRingColor("#E81123", "not a colour"), "#E81123")
+test("autoBorderColor returns the base unchanged for unparseable input", () => {
+  assert.equal(M.autoBorderColor("#E81123", "not a colour"), "#E81123")
 })
 
 // The two tests below pin the *choice*, not just the band. Everything above
@@ -963,67 +963,67 @@ test("autoRingColor returns the base unchanged for unparseable input", () => {
 // SLACK for the same reason as the band test above: the hue is read back out
 // of an 8-bit hex string, so the round trip quantises it by a few hundredths
 // of a degree.
-test("autoRingColor picks the far endpoint 350 for an accent up at the orange edge", () => {
+test("autoBorderColor picks the far endpoint 350 for an accent up at the orange edge", () => {
   const SLACK = 0.5
   const accent = "#FF6A00"
   assert.ok(Math.abs(M.hexToHsl(accent).h - 25) < 1, "fixture accent should sit near hue 25")
   // 25 is 15 degrees from the 40 endpoint and 35 from the 350 one, so 350 wins.
-  const hue = M.hexToHsl(M.autoRingColor("#E81123", accent)).h
+  const hue = M.hexToHsl(M.autoBorderColor("#E81123", accent)).h
   assert.ok(Math.abs(hue - M.ALARM_HUE_START) < SLACK,
             `expected the 350 endpoint for an accent at hue 25, got ${hue}`)
 })
 
-test("autoRingColor picks the far endpoint 40 for an accent down at the red edge", () => {
+test("autoBorderColor picks the far endpoint 40 for an accent down at the red edge", () => {
   const SLACK = 0.5
   const accent = "#FF0015"
   assert.ok(Math.abs(M.hexToHsl(accent).h - 355) < 1, "fixture accent should sit near hue 355")
   // 355 is 5 degrees from the 350 endpoint and 45 from the 40 one, so 40 wins.
-  const hue = M.hexToHsl(M.autoRingColor("#E81123", accent)).h
+  const hue = M.hexToHsl(M.autoBorderColor("#E81123", accent)).h
   assert.ok(Math.abs(hue - M.ALARM_HUE_END) < SLACK,
             `expected the 40 endpoint for an accent at hue 355, got ${hue}`)
 })
 
 // ------------------------------------------------------------ notifications
 
-test("ringTransition reports one up when the first ring appears", () => {
-  assert.equal(M.ringTransition(0, 4), "up")
+test("borderTransition reports one up when the first border appears", () => {
+  assert.equal(M.borderTransition(0, 4), "up")
 })
 
-test("ringTransition reports one down when the last ring goes", () => {
-  assert.equal(M.ringTransition(4, 0), "down")
+test("borderTransition reports one down when the last border goes", () => {
+  assert.equal(M.borderTransition(4, 0), "down")
 })
 
-test("ringTransition stays silent through churn", () => {
-  // The real 14-minute call revived 107 times without the ring ever coming
+test("borderTransition stays silent through churn", () => {
+  // The real 14-minute call revived 107 times without the border ever coming
   // down. Session-level toasts would have fired over two hundred times.
-  assert.equal(M.ringTransition(4, 4), null)
-  assert.equal(M.ringTransition(4, 8), null)
-  assert.equal(M.ringTransition(8, 4), null)
+  assert.equal(M.borderTransition(4, 4), null)
+  assert.equal(M.borderTransition(4, 8), null)
+  assert.equal(M.borderTransition(8, 4), null)
 })
 
-test("ringTransition stays silent when nothing was ever up", () => {
-  assert.equal(M.ringTransition(0, 0), null)
+test("borderTransition stays silent when nothing was ever up", () => {
+  assert.equal(M.borderTransition(0, 0), null)
 })
 
-test("ringTransition never claims a transition it cannot know", () => {
+test("borderTransition never claims a transition it cannot know", () => {
   // A false "stopped" while still sharing is this function's worst failure: it
   // tells you the capture ended when it has not. Unknown input stays silent
   // rather than coercing to zero. Negatives are unknown too -- they are not a
   // count, and treating -4 as truthy would swallow a real "up".
-  assert.equal(M.ringTransition(4, undefined), null)
-  assert.equal(M.ringTransition(4, NaN), null)
-  assert.equal(M.ringTransition(4, null), null)
-  assert.equal(M.ringTransition(undefined, 4), null)
-  assert.equal(M.ringTransition(-4, 4), null)
+  assert.equal(M.borderTransition(4, undefined), null)
+  assert.equal(M.borderTransition(4, NaN), null)
+  assert.equal(M.borderTransition(4, null), null)
+  assert.equal(M.borderTransition(undefined, 4), null)
+  assert.equal(M.borderTransition(-4, 4), null)
 })
 
-test("ringTransition reads a boolean sharingNow fed in as 0/1", () => {
+test("borderTransition reads a boolean sharingNow fed in as 0/1", () => {
   // Service.qml drives this from anyVisibleSession, not a strip count, and
   // passes the boolean through as 0/1 -- the same 0<->N edge.
-  assert.equal(M.ringTransition(0, 1), "up")
-  assert.equal(M.ringTransition(1, 0), "down")
-  assert.equal(M.ringTransition(1, 1), null)
-  assert.equal(M.ringTransition(0, 0), null)
+  assert.equal(M.borderTransition(0, 1), "up")
+  assert.equal(M.borderTransition(1, 0), "down")
+  assert.equal(M.borderTransition(1, 1), null)
+  assert.equal(M.borderTransition(0, 0), null)
 })
 
 // --------------------------------------------------- am I being captured?
@@ -1088,24 +1088,24 @@ test("anyVisibleSession tolerates junk in place of a state", () => {
   assert.equal(M.anyVisibleSession({}), false)
 })
 
-test("sessionStateWord says nothing about a row that is actually ringing", () => {
+test("sessionStateWord says nothing about a row that is actually bordered", () => {
   assert.equal(M.sessionStateWord({ visible: true, stopping: false }), "")
   assert.equal(M.sessionStateWord({ visible: true, stopping: true }), "",
-               "a ringing session in its stop grace is still on screen")
+               "a bordered session in its stop grace is still on screen")
 })
 
-test("sessionStateWord labels a row the ring has not reached yet", () => {
+test("sessionStateWord labels a row the border has not reached yet", () => {
   assert.equal(M.sessionStateWord({ visible: false, stopping: false }), "starting")
 })
 
 test("sessionStateWord does not call a session that already stopped 'starting'", () => {
   // A share that stops before its debounce fires never becomes visible and
   // sits out its grace instead. "starting" would be the wrong word for the
-  // same missing ring.
+  // same missing border.
   assert.equal(M.sessionStateWord({ visible: false, stopping: true }), "stopping")
 })
 
-test("sessionStateWord treats a missing row as not ringing", () => {
+test("sessionStateWord treats a missing row as not bordered", () => {
   assert.equal(M.sessionStateWord(null), "")
   assert.equal(M.sessionStateWord({}), "starting")
 })

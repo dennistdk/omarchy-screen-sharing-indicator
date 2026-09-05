@@ -38,7 +38,7 @@ for s in d["sessions"]:
         "VIS" if s["visible"] else "hid",
         s["count"], len(s["addresses"]), s["name"][:28]))
 # drawable decides Strip.shown: a VIS session whose target is undrawable maps
-# nothing, which is indistinguishable from a broken ring without this field.
+# nothing, which is indistinguishable from a broken border without this field.
 for t in d.get("targets", []):
     if t.get("kind") == "window":
         parts.append("draw=%s@%s" % (t.get("drawable"), t.get("monitor")))
@@ -47,7 +47,7 @@ print(" ".join(parts))
 
   # The JSON form carries the monitor, the box and the alpha. Alpha matters:
   # a surface mapped at a: 0 is present and invisible, which would look exactly
-  # like "no ring" while every count above says there is one.
+  # like "no border" while every count above says there is one.
   line+="  $(hyprctl -j layers 2>/dev/null | python3 -c '
 import json, sys
 try:

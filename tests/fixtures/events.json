@@ -3,7 +3,7 @@
   "note": "Events marked captured:true are raw socket2 lines recorded on Omarchy 4.0.2 / Hyprland 0.56.2 via `socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock`. They confirm OWNER arrives as the std::formatter spelling, not an integer. Window and region rows are synthetic: capturing them needs a portal client driven by hand, and the parse they exercise is the same one the captured monitor rows prove. The integer-OWNER rows are deliberately synthetic -- they guard a hypothetical build without the std::formatter<eScreenshareType> specialization, which this one has.",
   "observations": [
     "screencast (v1) is always posted immediately BEFORE screencastv2 for the same session, so seeing v1 is not evidence that v2 is missing.",
-    "grim holds a monitor session open for ~500 ms and is torn down by Hyprland's idle-stop timer, not by an immediate client disconnect. Measured 06.108 -> 06.608 and 11.130 -> 11.630. A debounce at or below 500 ms would flash a ring on every screenshot; the 700 ms default swallows it.",
+    "grim holds a monitor session open for ~500 ms and is torn down by Hyprland's idle-stop timer, not by an immediate client disconnect. Measured 06.108 -> 06.608 and 11.130 -> 11.630. A debounce at or below 500 ms would flash a border on every screenshot; the 700 ms default swallows it.",
     "grim with no -o argument opens one session per output: three concurrent sessions on a three-output setup, each with its own start and stop."
   ],
   "events": [

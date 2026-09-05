@@ -10,12 +10,12 @@ import qs.Ui
 // thing without either of them polling.
 BarWidget {
   id: root
-  moduleName: "screen-sharing-indicator"
+  moduleName: "io.github.dennistdk.screen-sharing-indicator"
 
-  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("screen-sharing-indicator") : null
-  // svc.sharingNow, not svc.ringCount: the chip answers "is something being
-  // captured", the strip count answers "is a ring drawn", and the ring toggles
-  // pull those apart. It also keeps a three-second Preview ring from turning the
+  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("io.github.dennistdk.screen-sharing-indicator") : null
+  // svc.sharingNow, not svc.borderCount: the chip answers "is something being
+  // captured", the strip count answers "is a border drawn", and the border toggles
+  // pull those apart. It also keeps a three-second Preview border from turning the
   // chip red. See Service.qml's sharingNow.
   readonly property bool sharing: svc ? svc.sharingNow === true : false
   readonly property bool pluginActive: svc ? svc.active : false
@@ -25,7 +25,7 @@ BarWidget {
   // plugin uses. The slashed eye is not decoration -- a switched-off indicator
   // is the one state where the bar must not look normal. Red and slashed at once
   // is reachable and meant to be: the plugin is paused while something is being
-  // captured anyway, which is when you most need to know the ring is not there.
+  // captured anyway, which is when you most need to know the border is not there.
   readonly property string glyphEye: "󰈈"     // md-eye (U+F0208)
   readonly property string glyphEyeOff: "󰈉"  // md-eye-off (U+F0209)
   readonly property string glyph: pluginActive ? glyphEye : glyphEyeOff
@@ -61,6 +61,12 @@ BarWidget {
   function close() {
     if (panelLoader.item && panelLoader.item.close) panelLoader.item.close()
   }
+
+  // Alias for the documented bar-widget contract. Nothing in the shell reaches
+  // for it today -- Bar.findPanelWidget gates on open/close/opened, and
+  // shell.toggle() routes through summon/hide -- but the develop guide lists it
+  // beside the other three, so the widget answers to the name it publishes.
+  function toggle() { togglePanel() }
 
   function closeForPopoutSwitch() {
     if (panelLoader.item && panelLoader.item.closeForPopoutSwitch) panelLoader.item.closeForPopoutSwitch()

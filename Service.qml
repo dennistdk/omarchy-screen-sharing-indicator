@@ -17,7 +17,7 @@ Item {
   property string omarchyPath: ""
   property var pluginRegistry: null
 
-  readonly property string pluginId: "screen-sharing-indicator"
+  readonly property string pluginId: "io.github.dennistdk.screen-sharing-indicator"
   readonly property string defaultColor: "#E81123"
 
   // Services are not injected `settings` the way bar widgets are, so read the
@@ -52,36 +52,36 @@ Item {
   // "#aarrggbb"; ShareModel's hex parser only accepts 3- or 6-digit forms, so
   // an alpha-bearing accent would otherwise silently leave auto mode inert.
   readonly property string themeAccent: normalizeAccent(Color && Color.accent ? String(Color.accent) : "")
-  // A throw would leave ringColor at QML's default for a string property that
-  // never evaluated -- empty, which paints no ring at all. Fall back to
+  // A throw would leave borderColor at QML's default for a string property that
+  // never evaluated -- empty, which paints no border at all. Fall back to
   // colorSpec instead.
-  readonly property string ringColor: {
+  readonly property string borderColor: {
     if (colorMode !== "auto" || !themeAccent) return colorSpec
     try {
-      return ShareModel.autoRingColor(colorSpec, themeAccent)
+      return ShareModel.autoBorderColor(colorSpec, themeAccent)
     } catch (e) {
       return colorSpec
     }
   }
   readonly property int widthPx: clampInt(settingsEntry.widthPx, 3, 1, 16)
-  // At or below 500 ms the ring can still flash on Hyprland's own idle-stop
+  // At or below 500 ms the border can still flash on Hyprland's own idle-stop
   // path, which fires 500 ms after the last copied frame.
   readonly property int debounceMs: clampInt(settingsEntry.debounceMs, 700, 0, 5000)
-  // How long a stop is held before the ring comes down. Hyprland emits the
+  // How long a stop is held before the border comes down. Hyprland emits the
   // same screencastv2>>0 for a real "stop sharing" and for its own 500 ms
   // idle stop, and there is no live-session query to tell them apart, so this
   // is a straight trade: too low and a still screen flickers, too high and the
-  // ring lingers after you really stop. 0 unmaps on the stop event.
+  // border lingers after you really stop. 0 unmaps on the stop event.
   readonly property int stopGraceMs: clampInt(settingsEntry.stopGraceMs, 1500, 0, 5000)
-  readonly property bool showWindowRings: settingsEntry.showWindowRings !== false
-  readonly property bool showMonitorRings: settingsEntry.showMonitorRings !== false
-  // Default false: the ring is already the cue, and an update should not
+  readonly property bool showWindowBorders: settingsEntry.showWindowBorders !== false
+  readonly property bool showMonitorBorders: settingsEntry.showMonitorBorders !== false
+  // Default false: the border is already the cue, and an update should not
   // start adding pop-ups to someone's desktop unasked.
   readonly property bool notify: settingsEntry.notify === true
 
   // QML ids are not reachable from outside the component, so the strip count
   // has to be a property for the bar widget to read.
-  readonly property int ringCount: stripModel.count
+  readonly property int borderCount: stripModel.count
   // Whether a preview's own strips are mapped. Read by Strip.qml's
   // pluginActive and by syncStrips' early return.
   property bool previewing: false
@@ -97,11 +97,11 @@ Item {
   // only thing the bar chip and the notifications may read. Off the session
   // table, not the strip model: `visible` already carries the debounce and the
   // stop grace, and no settings path can empty it -- the master toggle and both
-  // ring toggles stop the drawing, not the capture. See
+  // border toggles stop the drawing, not the capture. See
   // ShareModel.anyVisibleSession.
   //
   // Not gated on root.active: pausing does not stop the capture, so this stays
-  // true while paused. What pausing changes is that no ring is drawn (the
+  // true while paused. What pausing changes is that no border is drawn (the
   // chip's slashed glyph says so) and, below, that no toast is sent.
   readonly property bool sharingNow: ShareModel.anyVisibleSession(shareState)
   property string lastEvent: "starting"
@@ -120,7 +120,7 @@ Item {
     return n
   }
 
-  // An unparseable color would silently render the ring invisible, which is the
+  // An unparseable color would silently render the border invisible, which is the
   // one failure the user cannot see. Fall back loudly instead.
   function validColor(value, fallback) {
     var s = String(value === undefined || value === null ? "" : value).trim()
@@ -209,8 +209,8 @@ Item {
     // The per-monitor active workspace decides whether a tracked window is
     // drawable, and Hyprland.monitors does not track it without a refresh --
     // it keeps whatever was current when the shell started. A stale value that
-    // matches the window's workspace pins the ring on every desktop of that
-    // output; one that differs means the ring never appears at all. Neither
+    // matches the window's workspace pins the border on every desktop of that
+    // output; one that differs means the border never appears at all. Neither
     // looks like a stale read from the outside.
     if (name === "workspace" || name === "workspacev2"
         || name === "focusedmon" || name === "focusedmonv2"
@@ -241,7 +241,7 @@ Item {
 
   // refreshMonitors() is a round trip, so the data is not there yet when the
   // event handler returns. The 33 ms geometry poll would pick it up, but only
-  // while a window ring is visible, so re-sync explicitly instead.
+  // while a window border is visible, so re-sync explicitly instead.
   Timer {
     id: monitorSettle
     interval: 50
@@ -259,7 +259,7 @@ Item {
     onTriggered: {
       if (root.sawScreencastV2 || root.warnedLegacyOnly) return
       root.warnedLegacyOnly = true
-      console.warn("screen-sharing-indicator: this build emits screencast without screencastv2; no target name on the wire, so no ring will be shown")
+      console.warn("screen-sharing-indicator: this build emits screencast without screencastv2; no target name on the wire, so no border will be shown")
     }
   }
 
@@ -290,7 +290,7 @@ Item {
     var i
 
     // Match now, not when the debounce fires. Hyprland's NAME is the title
-    // captured at session init; Teams has usually retitled by the time the ring
+    // captured at session init; Teams has usually retitled by the time the border
     // is due, and a title match then would come back empty.
     for (i = 0; i < result.armKeys.length; i++) {
       next = matchOnStart(next, result.armKeys[i])
@@ -322,7 +322,7 @@ Item {
 
     // applyEvent hands back the same state object when it found nothing to
     // apply. For a stop that means no session owned it, by address or by name
-    // -- a ring nothing will take down. Rare, and invisible without this line.
+    // -- a border nothing will take down. Rare, and invisible without this line.
     if (!parsed.active && result.state === root.shareState) {
       logEvent("stop-orphan", parsed.type + " " + truncate(parsed.name)
                + " matched no session")
@@ -736,15 +736,15 @@ Item {
   // when it was safe costs one more button press; proceeding when it was not
   // costs someone's live presentation:
   //
-  //   ringCount   every strip on screen, real sessions and a running preview.
-  //   sharingNow  the session table. ringCount alone misses a live capture with
-  //               either ring toggle off, which draws no strip at all.
+  //   borderCount   every strip on screen, real sessions and a running preview.
+  //   sharingNow  the session table. borderCount alone misses a live capture with
+  //               either border toggle off, which draws no strip at all.
   //
   // Read live at call time and read twice: applyCursorFix() only starts a `cat`
   // of the file, and the restart is one more async round trip after that in
   // onCursorFixContentRead(). A share starting in that window would otherwise
   // be dropped with no refusal logged.
-  readonly property bool portalRestartUnsafe: root.ringCount > 0 || root.sharingNow
+  readonly property bool portalRestartUnsafe: root.borderCount > 0 || root.sharingNow
   property bool cursorFixBusy: false
 
   Process {
@@ -994,9 +994,9 @@ Item {
       boxW: model.boxW
       boxH: model.boxH
       shown: model.shown
-      stripColor: root.ringColor
+      stripColor: root.borderColor
       // A preview stays visible with the master toggle off: someone who just
-      // switched the ring off is exactly who wants to check a colour or width
+      // switched the border off is exactly who wants to check a colour or width
       // before switching it back on.
       pluginActive: root.active || root.previewing
       screenResolver: root.screenByName
@@ -1076,7 +1076,7 @@ Item {
   }
 
   // Returns a summary of why this session mapped what it did, so syncStrips
-  // can report a ring that is tracked but draws nothing.
+  // can report a border that is tracked but draws nothing.
   function collectWindowRows(session, monitors, toplevels, rows) {
     var summary = { targets: 0, drawable: 0, unresolved: 0, missing: 0, detail: "" }
     var addresses = session.addresses || []
@@ -1121,7 +1121,7 @@ Item {
       if (drawable) summary.drawable++
       else if (!summary.detail) {
         // Report the values, not the verdict. Four conditions can withdraw a
-        // ring and they call for completely different fixes.
+        // border and they call for completely different fixes.
         var mIpc = monitor.lastIpcObject ? monitor.lastIpcObject : monitor
         summary.detail = "not drawable on " + monitor.name
                        + ": mapped=" + obj.mapped + " hidden=" + obj.hidden
@@ -1144,7 +1144,7 @@ Item {
   }
 
   // A tracked, visible session that maps nothing is indistinguishable from a
-  // broken ring, from the presenter's seat and from a recording alike. Name the
+  // broken border, from the presenter's seat and from a recording alike. Name the
   // reason once per change of state, never once per 33 ms poll.
   property var mapReasons: ({})
 
@@ -1210,7 +1210,7 @@ Item {
         if (!session) continue
 
         if (session.type === ShareModel.OWNER_WINDOW) {
-          if (root.showWindowRings) {
+          if (root.showWindowBorders) {
             var reason = reasonFor(collectWindowRows(session, monitors, toplevels, rows))
             nextReasons[key] = reason
             if (root.mapReasons[key] !== reason) {
@@ -1218,7 +1218,7 @@ Item {
               else logEvent("strips-up", truncate(session.name) + " mapping normally")
             }
           }
-        } else if (root.showMonitorRings) {
+        } else if (root.showMonitorBorders) {
           collectMonitorRows(session, monitors, rows)
         }
       }
@@ -1268,7 +1268,7 @@ Item {
       console.warn("screen-sharing-indicator: preview failed to map: " + e)
     }
     previewTimer.restart()
-    logEvent("preview", "widthPx=" + root.widthPx + " color=" + root.ringColor)
+    logEvent("preview", "widthPx=" + root.widthPx + " color=" + root.borderColor)
   }
 
   // Order matters both ways: previewIds is read for removal before it is
@@ -1312,8 +1312,8 @@ Item {
 
   onShareStateChanged: syncStrips()
   onWidthPxChanged: syncStrips()
-  onShowWindowRingsChanged: syncStrips()
-  onShowMonitorRingsChanged: syncStrips()
+  onShowWindowBordersChanged: syncStrips()
+  onShowMonitorBordersChanged: syncStrips()
 
   // ---------------------------------------------------------------- status
 
@@ -1372,7 +1372,7 @@ Item {
     return out
   }
 
-  // Logical sizes, for confirming a monitor ring was built from 3072 rather
+  // Logical sizes, for confirming a monitor border was built from 3072 rather
   // than the 3840 buffer width.
   function screenSummaries() {
     var out = []
@@ -1392,13 +1392,13 @@ Item {
       widthPx: root.widthPx,
       color: root.colorSpec,
       colorMode: root.colorMode,
-      ringColor: root.ringColor,
-      showWindowRings: root.showWindowRings,
-      showMonitorRings: root.showMonitorRings,
+      borderColor: root.borderColor,
+      showWindowBorders: root.showWindowBorders,
+      showMonitorBorders: root.showMonitorBorders,
       sessions: sessionSummaries(),
       targets: targetSummaries(),
-      // "Is something being captured" and "is a ring drawn" are two questions,
-      // and the ring toggles can make them disagree. Both reported.
+      // "Is something being captured" and "is a border drawn" are two questions,
+      // and the border toggles can make them disagree. Both reported.
       sharingNow: root.sharingNow,
       strips: stripModel.count,
       screens: screenSummaries(),
@@ -1500,7 +1500,7 @@ Item {
   // The first live session's name and where it is drawn, e.g. "Firefox on
   // DP-1". A monitor session's name is already the output, so it needs no
   // suffix. Returns "" when nothing is live, which is why the stop toast --
-  // fired after the ring has already dropped -- never calls it.
+  // fired after the border has already dropped -- never calls it.
   function describeShare() {
     var sessions = sessionSummaries()
     for (var i = 0; i < sessions.length; i++) {
@@ -1522,7 +1522,7 @@ Item {
   //   - The idle-stop churn revives its session inside the grace without
   //     clearing `visible`, so a capture restarting every 500 ms still produces
   //     exactly one "started" and one "stopped".
-  //   - No settings toggle can move it, so flipping a ring switch mid-share
+  //   - No settings toggle can move it, so flipping a border switch mid-share
   //     announces neither a stop nor a start.
   //
   // lastSharingNow is updated before the notify gate, never inside it: the edge
@@ -1530,9 +1530,9 @@ Item {
   // announcing a stop the moment the plugin is switched back on -- would be its
   // own false report.
   onSharingNowChanged: {
-    var move = ShareModel.ringTransition(root.lastSharingNow ? 1 : 0, root.sharingNow ? 1 : 0)
+    var move = ShareModel.borderTransition(root.lastSharingNow ? 1 : 0, root.sharingNow ? 1 : 0)
     root.lastSharingNow = root.sharingNow
-    // The master toggle is the whole widget's off switch, not just the ring's,
+    // The master toggle is the whole widget's off switch, not just the border's,
     // so a paused indicator says nothing. sharingNow stays truthful throughout;
     // only the toast is suppressed.
     if (!root.active) return
@@ -1544,7 +1544,7 @@ Item {
     // Hyprland has no "what is being captured right now?" query and will not
     // re-emit a start event for a session that is already running, so a shell
     // restart mid-share leaves us blind until the next share begins.
-    console.log("screen-sharing-indicator: no live-session query; ring appears on next start event")
+    console.log("screen-sharing-indicator: no live-session query; border appears on next start event")
     logEvent("settings", "active=" + root.active + " debounceMs=" + root.debounceMs
              + " stopGraceMs=" + root.stopGraceMs
              + " widthPx=" + root.widthPx + " color=" + root.colorSpec)

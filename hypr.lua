@@ -1,4 +1,4 @@
--- Keeps the share ring out of other people's captures.
+-- Keeps the share border out of other people's captures.
 --
 -- Hyprland fills every no_screen_share layer's bounding box with black when it
 -- renders a monitor or region capture (CScreenshareFrame::renderMonitor). It
@@ -7,7 +7,7 @@
 -- cost them the entire frame. Window captures never include layer-shell
 -- surfaces at all.
 --
--- Without this rule the presenter still gets a red ring, and so does everyone
+-- Without this rule the presenter still gets a red border, and so does everyone
 -- watching a monitor share.
 --
 -- Loaded by a guarded dofile from the user's Hyprland config; see the plugin

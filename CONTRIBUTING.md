@@ -10,7 +10,7 @@ change against a running shell.
 | --- | --- |
 | `ShareModel.js` | Every pure decision: parsing, session bookkeeping, refcounting, geometry, settings merges, health verdicts |
 | `Service.qml` | The Hyprland event subscription, the timers, the strip surfaces, IPC |
-| `Strip.qml` | One edge of the ring |
+| `Strip.qml` | One edge of the border |
 | `BarWidget.qml` | The bar chip |
 | `Panel.qml` | The dropdown |
 | `hypr.lua` | The layer rule, loaded from the user's Hyprland config |
@@ -74,7 +74,7 @@ socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.sock
 Include the journal - `journalctl --user | grep screen-sharing-indicator` is
 enough to diagnose most of what goes wrong here. Say which portal client you
 were sharing through, whether it was a window, monitor or region share, and, if
-the ring misbehaved rather than the chip, `hyprctl layers | grep -c
+the border misbehaved rather than the chip, `hyprctl layers | grep -c
 screen-sharing-indicator` at the time.
 
 For a transient that is gone before you can type, `tests/record` samples the
@@ -82,12 +82,12 @@ model and the compositor together twice a second and writes both to a file.
 
 ## Scope
 
-The ring is a privacy cue, not decoration. Two consequences worth knowing
+The border is a privacy cue, not decoration. Two consequences worth knowing
 before proposing a change:
 
-- **When in doubt, overstate what is being shared.** A region share rings the
+- **When in doubt, overstate what is being shared.** A region share draws a border around the
   whole monitor because the compositor does not put the rectangle on the wire.
-  Ringing less than is captured is the dangerous direction to err in.
+  A border around less than is captured is the dangerous direction to err in.
 - **Nothing may leak red into a capture.** Any change touching strip geometry
   or the layer rule needs the capture-side matrix rows re-run, and the
   measurements in `tests/captures.md` updated if they move.

@@ -3,10 +3,10 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Ui
 
-// One edge of the ring. The surface *is* the ink: Hyprland's no_screen_share
+// One edge of the border. The surface *is* the ink: Hyprland's no_screen_share
 // fills a layer's whole bounding box with black in monitor captures, so the
 // bounding box has to be exactly as thin as the line. A full-output surface with
-// a stroked ring inside it would black out the audience's entire stream.
+// a stroked border inside it would black out the audience's entire stream.
 PanelWindow {
   id: panel
 

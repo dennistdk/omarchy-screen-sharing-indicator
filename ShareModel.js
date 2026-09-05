@@ -483,9 +483,9 @@ function fireDue(state, nowMs) {
 // "Is anything on this machine being captured right now?" -- answered from the
 // session table, never from the strip model.
 //
-// Strips answer a different question, "is a ring drawn", and three settings
+// Strips answer a different question, "is a border drawn", and three settings
 // paths empty the strip model while the capture runs: the master toggle, and
-// either ring toggle against a live share of that kind. `visible` means "past
+// either border toggle against a live share of that kind. `visible` means "past
 // its debounce, not yet through its stop grace", which is what "being captured"
 // means here, and no setting can touch it.
 //
@@ -504,11 +504,11 @@ function anyVisibleSession(state) {
 }
 
 // The word a panel row wears when the session is in the table but not on
-// screen; "" for a row that is actually ringing. Such rows are labelled, never
-// filtered: a capture the ring has not caught up with is still a capture, and
+// screen; "" for a row that is actually bordered. Such rows are labelled, never
+// filtered: a capture the border has not caught up with is still a capture, and
 // hiding it is the unsafe direction. "starting" is the debounce; a session that
 // stopped before its debounce fired is waiting out its grace instead, which is
-// the same missing ring for a different reason.
+// the same missing border for a different reason.
 function sessionStateWord(row) {
   if (!row) return ""
   if (row.visible === true) return ""
@@ -554,8 +554,8 @@ function matchWindows(toplevels, name, previousAddresses) {
   if (!wanted) return out
   for (i = 0; i < list.length; i++) {
     // Exact match, not substring and not case-folded. Every duplicate-title
-    // window gets ringed, deliberately: the event names a title, not an
-    // address, so ringing an arbitrary one would be a guess presented as fact.
+    // window gets a border, deliberately: the event names a title, not an
+    // address, so choosing an arbitrary one would be a guess presented as fact.
     if (toplevelTitle(list[i]) === wanted) out.push(list[i])
   }
   return out
@@ -723,11 +723,11 @@ function mergedSettings(current, changes) {
 
 // ------------------------------------------------------------------- colour
 
-// The ring is deliberately not the theme accent: a capture cue should read as
+// The border is deliberately not the theme accent: a capture cue should read as
 // "you are being captured", not as decoration. Auto mode does not harmonise
 // with the theme; it rescues the one case that breaks the cue, a theme accent
-// close enough to the ring that the two stop being distinguishable.
-var ALARM_HUE_START = 350   // the band the ring never leaves: red ...
+// close enough to the border that the two stop being distinguishable.
+var ALARM_HUE_START = 350   // the band the border never leaves: red ...
 var ALARM_HUE_END = 40      // ... through orange
 var ALARM_MIN_SAT = 0.35    // below this an accent cannot compete, whatever its hue
 
@@ -791,7 +791,7 @@ function hueInAlarmBand(h) {
 
 // The band is a contiguous arc, so the point within it furthest from the
 // accent is always one of its two endpoints.
-function autoRingColor(baseHex, accentHex) {
+function autoBorderColor(baseHex, accentHex) {
   var base = hexToHsl(baseHex)
   var accent = hexToHsl(accentHex)
   if (!base || !accent) return baseHex
@@ -820,7 +820,7 @@ function toCount(value) {
 // debounce and the stop grace because those are what `visible` is made of.
 //
 // Callers pass counts; a boolean goes in as 0/1, the same 0<->N edge.
-function ringTransition(prevCount, nextCount) {
+function borderTransition(prevCount, nextCount) {
   var p = toCount(prevCount)
   var n = toCount(nextCount)
   if (p === null || n === null) return null
@@ -841,7 +841,7 @@ function ringTransition(prevCount, nextCount) {
 // The accepted cost: that "missing" does not outlive the shell. A restart runs
 // the startup check, which requires presence and not freshness, so it reads the
 // same stale marker and reports "ok" again while the audience still sees the
-// ring. Bounded rather than fixed -- the marker lives in
+// border. Bounded rather than fixed -- the marker lives in
 // $XDG_RUNTIME_DIR/hypr/$HIS/ and cannot survive a Hyprland restart, and the
 // next reload reports "missing" once more. A freshness-requiring startup check
 // would instead cry wolf on every restart of a healthy setup.
@@ -1033,12 +1033,12 @@ if (typeof module !== "undefined") {
     logicalOutputSize: logicalOutputSize,
     entryFromConfig: entryFromConfig,
     mergedSettings: mergedSettings,
-    autoRingColor: autoRingColor,
+    autoBorderColor: autoBorderColor,
     hexToHsl: hexToHsl,
     ALARM_HUE_START: ALARM_HUE_START,
     ALARM_HUE_END: ALARM_HUE_END,
     toCount: toCount,
-    ringTransition: ringTransition,
+    borderTransition: borderTransition,
     layerRuleState: layerRuleState,
     layerRuleContentPresent: layerRuleContentPresent,
     parseCursorMode: parseCursorMode,

@@ -8,7 +8,7 @@ import "ShareModel.js" as ShareModel
 // The Screen Sharing Indicator panel: what is being shared right now, direct from the
 // service's live session table.
 //
-// It exists to answer one question -- "is that ring stale?" -- so it reads
+// It exists to answer one question -- "is that border stale?" -- so it reads
 // svc.sessionSummaries()/targetSummaries() through property bindings rather
 // than statusJson() on a timer. Both read Service.qml's own QML properties, and
 // QML's binding tracker follows property reads through a function call, so
@@ -16,7 +16,13 @@ import "ShareModel.js" as ShareModel
 // polling, no cached snapshot.
 Panel {
   id: root
-  moduleName: "screen-sharing-indicator"
+  moduleName: "io.github.dennistdk.screen-sharing-indicator"
+
+  // Service.qml owns the single IpcHandler on this plugin's target. The base's
+  // generic one is inert only while ipcTarget is unset, so this says out loud
+  // what the empty ipcTarget only implies: a later ipcTarget here must not
+  // quietly stand up a second handler competing for the same target.
+  manageIpc: false
 
   property var anchorItem: null
   property var hostWidget: null
@@ -46,7 +52,7 @@ Panel {
   readonly property var targets: (svc && root.opened) ? svc.targetSummaries() : []
   readonly property var rows: buildRows(sessions, targets)
 
-  // Rows actually ringing, not rows in the table -- see countActiveRows. "0
+  // Rows actually bordered, not rows in the table -- see countActiveRows. "0
   // active" over a list of rows marked "starting" is the honest reading of a
   // picker sitting open.
   readonly property int activeRowCount: countActiveRows(rows)
@@ -56,9 +62,40 @@ Panel {
 
   // A third state, distinct from the idle string: answering "nothing is being
   // shared" from ignorance would be an all-clear this code has not earned.
-  readonly property string statusText: root.serviceUnknown
-    ? "Checking…"
-    : "Nothing is being shared"
+  //
+  // And a fourth, for the same reason in the other direction. svc arrives by
+  // injection once BarWidget's Loader completes, so a null is normal for a
+  // moment at startup -- but shell.qml's ensureService logs a failed service
+  // load to the journal and returns null, leaving nothing to ever inject. An
+  // ellipsis that never resolves promises progress that is not coming, on a
+  // plugin whose whole premise is that the silent failure is the dangerous one.
+  property bool serviceLoadTimedOut: false
+
+  readonly property string statusText: !root.serviceUnknown
+    ? "Nothing is being shared"
+    : (root.serviceLoadTimedOut
+        ? "The indicator service is not running. Restart the shell."
+        : "Checking…")
+
+  onSvcChanged: {
+    if (svc) {
+      serviceLoadTimedOut = false
+      serviceWaitTimer.stop()
+    } else {
+      serviceWaitTimer.restart()
+    }
+  }
+
+  // Started here as well as on change: if injection never happens at all,
+  // onSvcChanged never fires and the timer would never have been armed.
+  Component.onCompleted: if (!root.svc) serviceWaitTimer.start()
+
+  Timer {
+    id: serviceWaitTimer
+    interval: 5000
+    repeat: false
+    onTriggered: root.serviceLoadTimedOut = true
+  }
 
   // Reset the settings cursor on every open, so a panel left mid-navigation
   // does not reopen with a stale cursor position or a highlight already lit.
@@ -109,16 +146,16 @@ Panel {
   // computes from settingsEntry -- so rows read right, and writeSetting still
   // works off root.settings, during the window where svc is null.
   readonly property bool activeSetting: svc ? svc.active : (root.setting("active", true) !== false)
-  readonly property bool windowRingsSetting: svc ? svc.showWindowRings : (root.setting("showWindowRings", true) !== false)
-  readonly property bool monitorRingsSetting: svc ? svc.showMonitorRings : (root.setting("showMonitorRings", true) !== false)
+  readonly property bool windowBordersSetting: svc ? svc.showWindowBorders : (root.setting("showWindowBorders", true) !== false)
+  readonly property bool monitorBordersSetting: svc ? svc.showMonitorBorders : (root.setting("showMonitorBorders", true) !== false)
   readonly property bool notifySetting: svc ? svc.notify : (root.setting("notify", false) === true)
 
   // ------------------------------------------------------------ appearance
 
-  // Six hand-picked reds, close to the red-to-orange arc autoRingColor guards
+  // Six hand-picked reds, close to the red-to-orange arc autoBorderColor guards
   // for "auto" (hue >= 350 or <= 40); two (#D40030 at 346, #FF1744 at 348) sit
   // just outside that band. Unambiguously red regardless -- none is near a hue
-  // that could read as a green "you are safe" ring.
+  // that could read as a green "you are safe" border.
   readonly property var colorPresets: ["#E81123", "#FF3B30", "#FF6A00", "#D40030", "#C1121F", "#FF1744"]
 
   readonly property string colorSetting: svc ? svc.colorSpec : String(root.setting("color", "#E81123") || "#E81123")
@@ -174,7 +211,7 @@ Panel {
   // -------------------------------------------------------------- health
   //
   // Two readouts, two otherwise invisible failures: the layer rule that keeps
-  // this ring out of *other people's* captures, and the cursor mode that decides
+  // this border out of *other people's* captures, and the cursor mode that decides
   // whether your pointer reaches them at all. Both judge through a pure severity
   // function in ShareModel.js rather than inline here, because both source
   // states carry a "no verdict yet" value that must render exactly like "ok" --
@@ -183,13 +220,29 @@ Panel {
   readonly property string cursorSeverity: svc ? ShareModel.cursorSeverity(svc.cursorState) : ""
   readonly property bool layerRuleWarningShown: root.layerRuleSeverity === "error"
 
+  // The rule being unloaded is always worth fixing, but "your audience can see
+  // this" is only true while a monitor or region capture is actually carrying
+  // it. Claiming it over an idle desktop, or during a window share that leaks
+  // nothing, spends the red on a moment that has not earned it -- the same
+  // standard statusText holds itself to. Both tiers carry the same fix.
+  readonly property bool borderLeakingNow: countLeakingRows(root.rows) > 0
+
+  readonly property string layerRuleHeadline: root.borderLeakingNow
+    ? "Your audience can see this border"
+    : "This border is not hidden from monitor captures"
+
+  readonly property string layerRuleBody: (root.borderLeakingNow
+    ? "The Hyprland layer rule that keeps this border out of monitor captures is not loaded, so anyone watching a monitor share right now sees it burned into their stream. "
+    : "The Hyprland layer rule that keeps this border out of monitor captures is not loaded. Share a monitor or a region and your audience will see it burned into their stream. ")
+    + "Add the guarded snippet from the README's \"Then do this - it is not optional\" install step to ~/.config/hypr/hyprland.lua (or autostart.lua), then hyprctl reload."
+
   // ------------------------------------------------------------ cursor fix
 
   readonly property bool cursorFixShown: root.cursorSeverity === "warning"
   // The service's own refusal gate, read off it rather than reconstructed here,
   // so the button is never enabled for a moment the action would refuse anyway.
-  // It covers a drawn ring (real session or preview) and a live capture with no
-  // ring, which is what either ring toggle produces.
+  // It covers a drawn border (real session or preview) and a live capture with no
+  // border, which is what either border toggle produces.
   readonly property bool sharingActive: svc ? svc.portalRestartUnsafe === true : false
   readonly property bool cursorFixBusy: svc ? svc.cursorFixBusy === true : false
   readonly property bool cursorFixEnabled: !root.sharingActive && !root.cursorFixBusy
@@ -235,8 +288,8 @@ Panel {
   function activateCursor() {
     clampCursor()
     if (cursorIndex === 0) toggleActive()
-    else if (cursorIndex === 1) toggleWindowRings()
-    else if (cursorIndex === 2) toggleMonitorRings()
+    else if (cursorIndex === 1) toggleWindowBorders()
+    else if (cursorIndex === 2) toggleMonitorBorders()
     else if (cursorIndex === 3) toggleNotify()
     else if (cursorIndex === 4) stepColorOption(1)
     else if (cursorIndex === 5) stepWidth(1)
@@ -247,8 +300,8 @@ Panel {
   // Shared by activateCursor() and each row's onClicked, so mouse and keyboard
   // flip the same write -- one path into writeSetting() per setting.
   function toggleActive() { root.writeSetting("active", !root.activeSetting) }
-  function toggleWindowRings() { root.writeSetting("showWindowRings", !root.windowRingsSetting) }
-  function toggleMonitorRings() { root.writeSetting("showMonitorRings", !root.monitorRingsSetting) }
+  function toggleWindowBorders() { root.writeSetting("showWindowBorders", !root.windowBordersSetting) }
+  function toggleMonitorBorders() { root.writeSetting("showMonitorBorders", !root.monitorBordersSetting) }
   function toggleNotify() { root.writeSetting("notify", !root.notifySetting) }
 
   function scrollItemIntoView(item) {
@@ -268,7 +321,7 @@ Panel {
   }
 
   function scrollCursorIntoView() {
-    var rows = [toggleActiveRow, toggleWindowRingsRow, toggleMonitorRingsRow, toggleNotifyRow,
+    var rows = [toggleActiveRow, toggleWindowBordersRow, toggleMonitorBordersRow, toggleNotifyRow,
                 colorRow, widthRow, previewButton, fixCursorButton]
     scrollItemIntoView(rows[cursorIndex])
   }
@@ -323,10 +376,10 @@ Panel {
         output: output,
         // Carried, not filtered on. sessionSummaries() returns the whole
         // session table, and a normal Teams picker flow fills it with sessions
-        // that are not ringing -- one measured flow held six window previews and
+        // that are not bordered -- one measured flow held six window previews and
         // three monitor ones at once, all inside their debounce with strips=0.
         // Dropping those rows would under-report a capture, the unsafe direction
-        // in the one place a user asks "is that ring stale?". rowMeta says which
+        // in the one place a user asks "is that border stale?". rowMeta says which
         // are not on screen.
         visible: session.visible === true,
         stopping: session.stopping === true
@@ -335,8 +388,8 @@ Panel {
     return out
   }
 
-  // How many rows are actually ringing. The hero counts this, not rows.length:
-  // nine picker previews reading "9 active" over zero rings is the false alarm
+  // How many rows are actually bordered. The hero counts this, not rows.length:
+  // nine picker previews reading "9 active" over zero borders is the false alarm
   // that teaches someone to stop trusting the number. The rows stay visible.
   function countActiveRows(rowList) {
     var n = 0
@@ -345,11 +398,25 @@ Panel {
     return n
   }
 
+  // Rows whose border is actually reaching someone else. A window share leaks
+  // nothing however broken the layer rule is -- window captures never include
+  // layer-shell surfaces at all -- so only a monitor or region row counts, and
+  // only once it is on screen rather than still inside its debounce.
+  function countLeakingRows(rowList) {
+    var n = 0
+    var list = rowList || []
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i]
+      if (row && row.visible && row.type !== ShareModel.OWNER_WINDOW) n++
+    }
+    return n
+  }
+
   // "Firefox · window · DP-1". When the identity already is the output
   // (monitor/region shares), the output segment would only repeat it, so it is
-  // dropped. A row with no ring on screen gains a state word -- "window ·
+  // dropped. A row with no border on screen gains a state word -- "window ·
   // starting" -- so a session the debounce has not passed never reads as a live
-  // ring. See ShareModel.sessionStateWord for why the word is not always
+  // border. See ShareModel.sessionStateWord for why the word is not always
   // "starting".
   function rowMeta(row) {
     var parts = [row.type]
@@ -427,8 +494,9 @@ Panel {
           // indeterminate (see layerRuleSeverity above); the column collapses to
           // zero height when hidden, so a healthy setup shows nothing here.
           // Placed ahead of even the session list, because its consequence --
-          // your audience is seeing the ring right now -- outranks what is
-          // currently sharing.
+          // a border reaching people who are not in the room -- outranks what is
+          // currently sharing. Whether that is happening or merely possible is
+          // borderLeakingNow's call, and it picks both the wording and the red.
           Column {
             id: layerRuleWarningColumn
             visible: root.layerRuleWarningShown
@@ -437,8 +505,8 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "Your audience can see this ring"
-              color: Color.urgent
+              text: root.layerRuleHeadline
+              color: root.borderLeakingNow ? Color.urgent : root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.subtitle
               font.bold: true
@@ -446,7 +514,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "The Hyprland layer rule that keeps this ring out of monitor captures is not loaded, so anyone watching a monitor share right now sees it burned into their stream. Add the guarded snippet from the README's \"Then do this - it is not optional\" install step to ~/.config/hypr/hyprland.lua (or autostart.lua), then hyprctl reload."
+              text: root.layerRuleBody
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -469,7 +537,7 @@ Panel {
             visible: root.cursorFixShown
             width: parent.width
             textFormat: Text.PlainText
-            text: "Cursor issue - see Appearance below"
+            text: "Your pointer may not reach your audience -- see Appearance below"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -480,7 +548,7 @@ Panel {
             visible: root.rows.length === 0
             width: parent.width
             text: root.statusText
-            color: root.dim
+            color: root.serviceLoadTimedOut ? root.foreground : root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
             wrapMode: Text.WordWrap
@@ -542,7 +610,7 @@ Panel {
               id: toggleActiveRow
               width: parent.width
               label: "Enabled"
-              description: "Off pauses the ring without losing your other settings. Removing this widget from your bar stops the ring entirely -- its bar entry is also its on switch."
+              description: "Off hides the border. The icon still tracks shares."
               checked: root.activeSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -554,30 +622,30 @@ Panel {
             }
 
             Toggle {
-              id: toggleWindowRingsRow
+              id: toggleWindowBordersRow
               width: parent.width
-              label: "Window rings"
-              description: "Draw a ring around a shared window."
-              checked: root.windowRingsSetting
+              label: "Window borders"
+              description: "Draw a border around a shared window."
+              checked: root.windowBordersSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
               hasCursor: root.cursorActive && root.cursorIndex === 1
-              onClicked: root.toggleWindowRings()
+              onClicked: root.toggleWindowBorders()
               onHovered: function(isHovered) {
                 if (isHovered) { root.cursorActive = true; root.cursorIndex = 1 }
               }
             }
 
             Toggle {
-              id: toggleMonitorRingsRow
+              id: toggleMonitorBordersRow
               width: parent.width
-              label: "Monitor rings"
-              description: "Draw a ring around a shared monitor."
-              checked: root.monitorRingsSetting
+              label: "Monitor borders"
+              description: "Draw a border around a shared monitor."
+              checked: root.monitorBordersSetting
               foreground: root.foreground
               fontFamily: root.fontFamily
               hasCursor: root.cursorActive && root.cursorIndex === 2
-              onClicked: root.toggleMonitorRings()
+              onClicked: root.toggleMonitorBorders()
               onHovered: function(isHovered) {
                 if (isHovered) { root.cursorActive = true; root.cursorIndex = 2 }
               }
@@ -587,7 +655,7 @@ Panel {
               id: toggleNotifyRow
               width: parent.width
               label: "Notifications"
-              description: "Toast when sharing starts and stops."
+              description: "Desktop notification when sharing starts and stops."
               checked: root.notifySetting
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -638,21 +706,11 @@ Panel {
 
                 Text {
                   textFormat: Text.PlainText
-                  text: "Ring color"
+                  text: "Border color"
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.subtitle
                   font.bold: true
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: "Presets are hand-picked reds, chosen so none could be mistaken for a green all-clear."
-                  color: Qt.darker(root.foreground, 1.5)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  wrapMode: Text.WordWrap
-                  width: parent.width
                 }
 
                 Row {
@@ -697,9 +755,17 @@ Panel {
                     }
 
                     MouseArea {
+                      id: autoMouse
                       anchors.fill: parent
+                      hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
                       onClicked: root.pickAuto()
+                    }
+
+                    PanelToolTip {
+                      visible: autoMouse.containsMouse
+                      text: "Shifts the colour if it is too close to your theme accent."
+                      fontFamily: root.fontFamily
                     }
                   }
                 }
@@ -734,7 +800,7 @@ Panel {
 
                   Text {
                     textFormat: Text.PlainText
-                    text: "Ring width"
+                    text: "Border width"
                     color: root.foreground
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.subtitle
@@ -743,7 +809,7 @@ Panel {
 
                   Text {
                     textFormat: Text.PlainText
-                    text: "The audience's monitor capture blacks out roughly double this in physical pixels -- not purely cosmetic."
+                    text: "Your audience sees roughly double this in black."
                     color: Qt.darker(root.foreground, 1.5)
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -785,8 +851,8 @@ Panel {
             Button {
               id: previewButton
               width: parent.width
-              text: "Preview ring"
-              tooltipText: "Show the ring on the focused output for three seconds -- no notification."
+              text: "Preview border"
+              tooltipText: "Shows the border for three seconds on the focused output."
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
@@ -831,7 +897,7 @@ Panel {
               // user driving it never triggers a hover.
               Text {
                 textFormat: Text.PlainText
-                text: "Edits ~/.config/hypr/xdph.conf and restarts the desktop portal (xdg-desktop-portal-hyprland)."
+                text: "Edits ~/.config/hypr/xdph.conf and restarts the desktop portal."
                 color: Qt.darker(root.foreground, 1.5)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -842,8 +908,7 @@ Panel {
               Button {
                 id: fixCursorButton
                 width: parent.width
-                text: root.cursorFixBusy ? "Fixing…" : "Fix: show the cursor by default"
-                tooltipText: "Edits ~/.config/hypr/xdph.conf and restarts the desktop portal."
+                text: root.cursorFixBusy ? "Fixing…" : "Show the cursor by default"
                 bordered: true
                 foreground: root.foreground
                 fontFamily: root.fontFamily
@@ -862,7 +927,7 @@ Panel {
               Text {
                 visible: root.sharingActive
                 textFormat: Text.PlainText
-                text: "Disabled while you are sharing your screen -- restarting the portal would drop it."
+                text: "Disabled while sharing -- restarting the portal would drop it."
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -876,7 +941,7 @@ Panel {
               // cursor and keeps getting one.
               Text {
                 textFormat: Text.PlainText
-                text: "This changes only the default for apps that do not ask. An app that explicitly requests a hidden cursor still hides it."
+                text: "Sets the default only -- an app can still hide the cursor."
                 color: Qt.darker(root.foreground, 1.5)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
