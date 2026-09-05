@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "screen-sharing-indicator",
+  "name": "Screen Sharing Indicator",
+  "version": "1.0.0",
+  "author": "Dennis Thomsen",
+  "license": "MIT",
+  "description": "Presenter-visible red ring around the window or monitor currently shared through the desktop portal. The audience sees at most a thin black strip on monitor captures, and nothing at all on window captures.",
+  "kinds": ["service", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Screen Sharing Indicator",
+    "description": "Shows what you are currently sharing, and warns when the setup that keeps the ring out of captures is missing",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "active": true,
+      "colorMode": "fixed",
+      "color": "#E81123",
+      "widthPx": 3,
+      "notify": false,
+      "showWindowRings": true,
+      "showMonitorRings": true
+    }
+  }
+}

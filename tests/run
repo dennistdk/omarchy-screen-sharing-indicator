@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Unit tests for the pure model. No Quickshell, no compositor, no timers.
+# `node --test <dir>` treats the directory as an entry module on Node 26, so
+# hand it the files.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec node --test "$here"/*.test.mjs

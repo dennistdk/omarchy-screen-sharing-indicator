@@ -1,0 +1,89 @@
+{
+  "source": "mixed",
+  "note": "Events marked captured:true are raw socket2 lines recorded on Omarchy 4.0.2 / Hyprland 0.56.2 via `socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock`. They confirm OWNER arrives as the std::formatter spelling, not an integer. Window and region rows are synthetic: capturing them needs a portal client driven by hand, and the parse they exercise is the same one the captured monitor rows prove. The integer-OWNER rows are deliberately synthetic -- they guard a hypothetical build without the std::formatter<eScreenshareType> specialization, which this one has.",
+  "observations": [
+    "screencast (v1) is always posted immediately BEFORE screencastv2 for the same session, so seeing v1 is not evidence that v2 is missing.",
+    "grim holds a monitor session open for ~500 ms and is torn down by Hyprland's idle-stop timer, not by an immediate client disconnect. Measured 06.108 -> 06.608 and 11.130 -> 11.630. A debounce at or below 500 ms would flash a ring on every screenshot; the 700 ms default swallows it.",
+    "grim with no -o argument opens one session per output: three concurrent sessions on a three-output setup, each with its own start and stop."
+  ],
+  "events": [
+    {
+      "why": "grim -o DP-1: monitor share start. OWNER is the string, not 0",
+      "captured": true,
+      "line": "screencastv2>>1,monitor,DP-1",
+      "expect": { "active": true, "type": "monitor", "name": "DP-1" }
+    },
+    {
+      "why": "grim -o DP-1: matching stop 500 ms later",
+      "captured": true,
+      "line": "screencastv2>>0,monitor,DP-1",
+      "expect": { "active": false, "type": "monitor", "name": "DP-1" }
+    },
+    {
+      "why": "grim across all outputs: second concurrent session",
+      "captured": true,
+      "line": "screencastv2>>1,monitor,DP-2",
+      "expect": { "active": true, "type": "monitor", "name": "DP-2" }
+    },
+    {
+      "why": "grim across all outputs: third concurrent session",
+      "captured": true,
+      "line": "screencastv2>>1,monitor,HDMI-A-1",
+      "expect": { "active": true, "type": "monitor", "name": "HDMI-A-1" }
+    },
+    {
+      "why": "window share, plain title",
+      "captured": false,
+      "line": "screencastv2>>1,window,Coast - Hotel Pools",
+      "expect": { "active": true, "type": "window", "name": "Coast - Hotel Pools" }
+    },
+    {
+      "why": "matching stop for the window share",
+      "captured": false,
+      "line": "screencastv2>>0,window,Coast - Hotel Pools",
+      "expect": { "active": false, "type": "window", "name": "Coast - Hotel Pools" }
+    },
+    {
+      "why": "NAME contains commas; must not be truncated",
+      "captured": false,
+      "line": "screencastv2>>1,window,Inbox - Foo, Bar - Microsoft Teams",
+      "expect": { "active": true, "type": "window", "name": "Inbox - Foo, Bar - Microsoft Teams" }
+    },
+    {
+      "why": "region share; NAME is the monitor connector, no box on the wire",
+      "captured": false,
+      "line": "screencastv2>>1,region,HDMI-A-1",
+      "expect": { "active": true, "type": "region", "name": "HDMI-A-1" }
+    },
+    {
+      "why": "integer OWNER fallback: 0 is SHARE_MONITOR",
+      "captured": false,
+      "line": "screencastv2>>1,0,DP-2",
+      "expect": { "active": true, "type": "monitor", "name": "DP-2" }
+    },
+    {
+      "why": "integer OWNER fallback: 1 is SHARE_WINDOW",
+      "captured": false,
+      "line": "screencastv2>>1,1,Coast - Hotel Pools",
+      "expect": { "active": true, "type": "window", "name": "Coast - Hotel Pools" }
+    },
+    {
+      "why": "integer OWNER fallback: 2 is SHARE_REGION",
+      "captured": false,
+      "line": "screencastv2>>1,2,DP-1",
+      "expect": { "active": true, "type": "region", "name": "DP-1" }
+    },
+    {
+      "why": "empty NAME must not be guessed at",
+      "captured": false,
+      "line": "screencastv2>>1,window,",
+      "expect": { "active": true, "type": "window", "name": "" }
+    },
+    {
+      "why": "SHARE_NONE formats as \"ERR NONE\" and is not a target",
+      "captured": false,
+      "line": "screencastv2>>1,ERR NONE,",
+      "expect": { "active": true, "type": "", "name": "" }
+    }
+  ]
+}

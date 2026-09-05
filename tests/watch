@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Compact view of what the share indicator currently believes is captured.
+# Bare for one snapshot, `-f` to follow twice a second while you drive a share.
+set -uo pipefail
+
+snap() {
+  omarchy-shell screen-sharing-indicator status 2>/dev/null | python3 -c '
+import json, sys
+raw = sys.stdin.read()
+if not raw.strip():
+    print("  shell not answering -- is omarchy-shell running?")
+    sys.exit(0)
+d = json.loads(raw)
+print("strips=%-3d active=%-5s debounceMs=%d stopGraceMs=%d widthPx=%d" % (
+    d["strips"], "true" if d["active"] else "false",
+    d["debounceMs"], d["stopGraceMs"], d["widthPx"]))
+if not d["sessions"]:
+    print("  (no sessions)")
+import time
+now = time.time() * 1000
+for s in d["sessions"]:
+    # A window session with no window is an orphan candidate. It draws
+    # nothing, but until the reaper takes it, it can still re-acquire a window
+    # by title -- so it is worth seeing.
+    orphan = ""
+    since = s.get("addressLessSince", 0)
+    if since:
+        orphan = "  ORPHAN no-window-for=%.1fs" % ((now - since) / 1000.0)
+    print("  %-7s %-8s %-7s count=%d addrs=%d  %s%s" % (
+        s["type"],
+        "stopping" if s["stopping"] else "live",
+        "VISIBLE" if s["visible"] else "hidden",
+        s["count"], len(s["addresses"]), s["name"][:44], orphan))
+# drawable is what decides Strip.shown, so a session that is VISIBLE with an
+# undrawable target maps nothing at all -- off-workspace, unmapped or hidden.
+for t in d.get("targets", []):
+    if t.get("kind") == "window":
+        print("      target %s on %s at=%s drawable=%s" % (
+            t.get("address"), t.get("monitor"), t.get("at"), t.get("drawable")))
+'
+}
+
+if [ "${1:-}" = "-f" ]; then
+  while true; do
+    clear
+    date +%H:%M:%S.%3N
+    snap
+    sleep 0.5
+  done
+else
+  snap
+fi

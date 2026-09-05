@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# The audience's view of one output, via grim -- which goes through the same
+# ScreenshareManager path a real monitor share does.
+#
+# A correctly ruled ring reads as BLACK in a capture, never as red:
+# no_screen_share fills the layer's whole bounding box. So the verdicts are
+#
+#   a handful of red px, black confined   pass
+#   red in the thousands                  FAIL -- the layer rule is not applied
+#   almost the whole frame black          FAIL -- a full-output surface is being filled
+#
+# "A handful" rather than zero: a full monitor ring leaks 8 px of ring colour as
+# two 4x1 slivers at the bottom corners, where the side strips end on a
+# fractional physical row (logical 1725 * 1.25 = 2156.25) and the fill rounds one
+# row short of the surface. Measured, understood, invisible. A genuine rule
+# failure is three orders of magnitude larger -- a *single* unruled strip measures
+# 75,000 px -- so the two are never hard to tell apart. See tests/captures.md.
+#
+# Usage: tests/audience [output]        (default DP-1)
+set -uo pipefail
+
+out="${1:-DP-1}"
+
+# The ring colour is a setting, so ask for it rather than assuming the default.
+ring_color=$(omarchy-shell screen-sharing-indicator status 2>/dev/null \
+  | python3 -c 'import json,sys
+raw=sys.stdin.read()
+print(json.loads(raw)["color"] if raw.strip() else "#E81123")' 2>/dev/null) || ring_color="#E81123"
+[ -n "$ring_color" ] || ring_color="#E81123"
+
+shot=$(mktemp --suffix=.png)
+trap 'rm -f "$shot"' EXIT
+grim -o "$out" "$shot"
+
+px() {
+  magick "$shot" -fuzz 2% -transparent "$1" -alpha extract \
+    -format '%[fx:int(w*h*(1-mean)+0.5)]' info:
+}
+
+# %[fx:w*h] comes back as 8.2944e+06, which bash arithmetic will not take.
+read -r shot_w shot_h < <(identify -format '%w %h' "$shot")
+total=$(( shot_w * shot_h ))
+red=$(px "$ring_color")
+black=$(px '#000000')
+
+printf '%s  %s px total   ring(%s)=%s   black=%s\n' "$out" "$total" "$ring_color" "$red" "$black"
+
+# Well above the measured 8 px of corner slivers, far below one unruled strip.
+LEAK_ALLOWANCE=500
+
+if [ "$red" -gt "$LEAK_ALLOWANCE" ]; then
+  echo "FAIL: $red px of ring colour reached the capture, past the $LEAK_ALLOWANCE px allowance."
+  echo "      The layer rule is not being applied -- check that hypr.lua is loaded (hyprctl"
+  echo "      layers, and the guarded dofile in hyprland.lua)."
+  exit 1
+elif [ "$black" -gt $((total * 9 / 10)) ]; then
+  echo "FAIL: over 90% of the frame is black -- a full-output surface is being filled."
+  exit 1
+else
+  if [ "$red" -gt 0 ]; then
+    echo "pass: ring colour held to $red px (the known corner slivers), black $black px"
+  else
+    echo "pass: no ring colour in the capture, black $black px"
+  fi
+  echo "      (a dark wallpaper inflates the black count; compare against a no-ring baseline)"
+fi

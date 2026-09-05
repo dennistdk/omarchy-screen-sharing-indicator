@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Sample the model and the compositor together, twice a second, so a transient
+# can be caught without typing anything while driving a share picker.
+#
+# The point is the pair of numbers on each line:
+#   strips=N   rows the model wants
+#   mapped=N   layer surfaces the compositor actually has
+# A model that wants strips while the compositor has none is the interesting
+# case -- it means syncStrips or the Strip visible binding, not the state
+# machine. When mapped>0 the surface geometry is appended, so a surface mapped
+# at nonsense coordinates is visible here too.
+#
+# Usage: tests/record [seconds] [outfile]
+set -uo pipefail
+
+secs="${1:-180}"
+out="${2:-/tmp/screen-sharing-indicator-record.log}"
+end=$(( $(date +%s) + secs ))
+: > "$out"
+
+echo "recording for ${secs}s to $out -- drive the share now" >&2
+
+while [ "$(date +%s)" -lt "$end" ]; do
+  line="$(date +%H:%M:%S.%3N) "
+  line+="$(omarchy-shell screen-sharing-indicator status 2>/dev/null | python3 -c '
+import json, sys
+raw = sys.stdin.read()
+if not raw.strip():
+    print("no-status"); raise SystemExit
+d = json.loads(raw)
+parts = ["strips=%d" % d["strips"]]
+if not d["sessions"]:
+    parts.append("(none)")
+for s in d["sessions"]:
+    parts.append("[%s %s %s count=%d addrs=%d %r]" % (
+        s["type"],
+        "stopping" if s["stopping"] else "live",
+        "VIS" if s["visible"] else "hid",
+        s["count"], len(s["addresses"]), s["name"][:28]))
+# drawable decides Strip.shown: a VIS session whose target is undrawable maps
+# nothing, which is indistinguishable from a broken ring without this field.
+for t in d.get("targets", []):
+    if t.get("kind") == "window":
+        parts.append("draw=%s@%s" % (t.get("drawable"), t.get("monitor")))
+print(" ".join(parts))
+' 2>/dev/null || echo "status-failed")"
+
+  # The JSON form carries the monitor, the box and the alpha. Alpha matters:
+  # a surface mapped at a: 0 is present and invisible, which would look exactly
+  # like "no ring" while every count above says there is one.
+  line+="  $(hyprctl -j layers 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("mapped=?"); raise SystemExit
+hits = []
+for mon, v in d.items():
+    for level, layers in (v.get("levels") or {}).items():
+        for l in layers:
+            if "screen-sharing-indicator" in str(l.get("namespace", "")):
+                hits.append("%s:%d,%d,%dx%d a=%s" % (
+                    mon, l["x"], l["y"], l["w"], l["h"], l.get("alpha")))
+out = "mapped=%d" % len(hits)
+if hits:
+    out += "  " + " ".join(hits)
+print(out)
+' 2>/dev/null || echo 'mapped=?')"
+
+  printf '%s\n' "$line" >> "$out"
+  sleep 0.5
+done
+
+echo "done: $out" >&2
