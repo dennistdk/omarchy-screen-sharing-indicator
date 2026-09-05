@@ -199,7 +199,7 @@ is on your bar):
 | `stopGraceMs` | `1500` | How long a stop is held before the border comes down, clamped 0-5000. Hyprland ends a capture 500 ms after the last copied frame and emits the same event a real "stop sharing" does, so without this a still screen flickers and the border often never appears at all. The cost is that the border lingers this long after you genuinely stop. `0` unmaps on the stop event. |
 | `showWindowBorders` | `true` | |
 | `showMonitorBorders` | `true` | Also covers region shares. |
-| `notify` | `false` | Desktop notification when a share starts and stops. Off by default - the border is already the cue, and an update shouldn't start adding pop-ups to your desktop unasked. A preview never triggers one, even if it overlaps a real share. |
+| `notify` | `false` | Desktop notification when a capture starts and stops. Off by default because the toast lands *inside* the capture: notifications are not covered by the layer rule, so a portal-backed recording gets it burned into its opening seconds. Turn it on if you want a second cue and are not recording. A screenshot, a preview or a settings change never triggers one - only a session past `debounceMs` counts. |
 
 Changes apply live; no shell restart needed.
 
@@ -255,6 +255,14 @@ Dumps the session table, the matched window addresses, and the strip count as JS
 - **Sharing a browser tab draws a border around the whole browser window.** Hyprland cannot see tabs.
 - **Two windows with the same title both get a border.** The share event identifies the
   target by title, so this is the honest answer rather than a guess.
+- **Omarchy's own screen recorder is invisible to this plugin.**
+  `omarchy-capture-screenrecording` defaults to gpu-screen-recorder's kms
+  backend, which reads frames from DRM rather than through the portal, so
+  Hyprland emits no `screencast` event and no border is drawn. Recording that
+  way is also unaffected by the layer rule, so nothing is blacked out either.
+  Export `OMARCHY_SCREENRECORD_USE_PORTAL=true` to record through the portal
+  instead, which the plugin sees like any other client. OBS and other
+  portal-based recorders are seen normally.
 - **No rounded corners.** The strips are axis-aligned rectangles; rounding them would
   mean a larger bounding box, which means more black in your audience's capture.
 

@@ -34,8 +34,11 @@ Initial release.
   the guarded loader with the plugin's real install path, and reloads Hyprland.
   It emits the `io.open` guard and the `pcall` every time, which hand-copying is
   the one path that can get wrong.
-- Optional desktop notifications when a share starts and stops (`notify`, off
-  by default). Settings changes and preview borders never fire one.
+- Optional desktop notifications when a capture starts and stops (`notify`, off
+  by default: the toast is not covered by the layer rule, so it would be burned
+  into a portal-backed recording). Screenshots, previews and settings changes
+  never fire one -- the edge comes from the debounced session state, not the
+  raw event.
 - `omarchy-shell screen-sharing-indicator status` for the session table, the
   matched window addresses and the strip count, as JSON.
 - Unit tests over the pure model (`tests/run`), plus a manual matrix

@@ -75,8 +75,13 @@ Item {
   readonly property int stopGraceMs: clampInt(settingsEntry.stopGraceMs, 1500, 0, 5000)
   readonly property bool showWindowBorders: settingsEntry.showWindowBorders !== false
   readonly property bool showMonitorBorders: settingsEntry.showMonitorBorders !== false
-  // Default false: the border is already the cue, and an update should not
-  // start adding pop-ups to someone's desktop unasked.
+  // Default false, and for a sharper reason than "don't surprise people": the
+  // toast lands *inside* the capture. Notifications are layer-shell surfaces
+  // under omarchy-notifications, a namespace this plugin's rule does not and
+  // should not cover, so a portal-backed recording gets "Screen capture
+  // started" burned into its own opening seconds. The border is already the
+  // presenter's cue; a second channel is not worth defacing someone's
+  // recording by default. Opt in if you want it.
   readonly property bool notify: settingsEntry.notify === true
 
   // QML ids are not reachable from outside the component, so the strip count
@@ -1607,7 +1612,7 @@ Item {
   function sendNotification(summary, body) {
     if (!root.notify) return
     notifier.running = false
-    notifier.command = ["notify-send", "--app-name=Screen sharing", "--", summary, body || ""]
+    notifier.command = ["notify-send", "--app-name=Screen capture", "--", summary, body || ""]
     notifier.running = true
   }
 
@@ -1663,8 +1668,8 @@ Item {
     // so a paused indicator says nothing. sharingNow stays truthful throughout;
     // only the toast is suppressed.
     if (!root.active) return
-    if (move === "up") sendNotification("Screen sharing started", describeShare())
-    else if (move === "down") sendNotification("Screen sharing stopped", "")
+    if (move === "up") sendNotification("Screen capture started", describeShare())
+    else if (move === "down") sendNotification("Screen capture stopped", "")
   }
 
   Component.onCompleted: {
