@@ -387,7 +387,7 @@ rewrites its marker on every reload, and the service re-reads that marker, so
 a warning that clears itself *is* the proof the rule loaded.
 
 - **Do:** with the loader absent from `~/.config/hypr/hyprland.lua`, open the
-  dropdown. Press **Load the layer rule**.
+  dropdown. Press **Hide the border from your audience**.
 - **Expect:** the warning disappears within a second or two. `hyprland.lua`
   gains the guarded `do ... end` block with the plugin's real install path, and
   a sibling `hyprland.lua.bak.<epoch>` appears next to it. The journal logs

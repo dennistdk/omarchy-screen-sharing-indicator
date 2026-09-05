@@ -30,7 +30,7 @@ Initial release.
   `xdph.conf`, each with a one-click fix. The cursor fix refuses while a share is
   running, since it restarts the portal; the layer-rule fix does not need to,
   since `hyprctl reload` cannot drop a capture.
-- **Load the layer rule** button: backs up `~/.config/hypr/hyprland.lua`, appends
+- **Hide the border from your audience** button: backs up `~/.config/hypr/hyprland.lua`, appends
   the guarded loader with the plugin's real install path, and reloads Hyprland.
   It emits the `io.open` guard and the `pcall` every time, which hand-copying is
   the one path that can get wrong.

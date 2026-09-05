@@ -56,7 +56,7 @@ Either way, enabling drops an eye icon into your bar's right section - see
 ### Then do this - it is not optional
 
 **The quick way.** Click the eye in your bar. If the layer rule is missing, the
-dropdown shows a warning with a **Load the layer rule** button. Press it: it backs
+dropdown shows a warning with a **Hide the border from your audience** button. Press it: it backs
 up `~/.config/hypr/hyprland.lua`, appends the guarded loader below, and runs
 `hyprctl reload`. The warning then clears itself - the plugin re-reads the marker
 `hypr.lua` writes, so it confirms the rule really loaded rather than assuming the

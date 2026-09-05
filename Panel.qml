@@ -229,14 +229,14 @@ Panel {
 
   readonly property string layerRuleHeadline: root.borderLeakingNow
     ? "Your audience can see this border"
-    : "This border is not hidden from monitor captures"
+    : "This border is not private yet"
 
   // The headline already gives the diagnosis, so the body only has to say what
   // it costs; the button below says how to end it. That is what let this drop
   // from ~330 characters of README directions to one line.
   readonly property string layerRuleBody: root.borderLeakingNow
-    ? "A monitor share is carrying it into their stream right now."
-    : "Share a monitor or region and your audience will see it."
+    ? "Anyone watching your monitor share sees it in their stream."
+    : "Share a monitor or region and your audience will see it too."
 
   // ------------------------------------------------------------ cursor fix
 
@@ -571,7 +571,7 @@ Panel {
             Text {
               visible: root.layerRuleFixShown
               textFormat: Text.PlainText
-              text: "Adds a guarded loader to ~/.config/hypr/hyprland.lua and reloads Hyprland."
+              text: "Edits ~/.config/hypr/hyprland.lua and reloads Hyprland."
               color: Qt.darker(root.foreground, 1.5)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -583,7 +583,7 @@ Panel {
               id: fixLayerRuleButton
               visible: root.layerRuleFixShown
               width: parent.width
-              text: root.layerRuleFixBusy ? "Loading…" : "Load the layer rule"
+              text: root.layerRuleFixBusy ? "Hiding…" : "Hide the border from your audience"
               bordered: true
               foreground: root.foreground
               fontFamily: root.fontFamily
