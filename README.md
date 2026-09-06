@@ -293,6 +293,37 @@ journalctl --user -f | grep screen-sharing-indicator
 It fails silently, in two different ways; [`CONTRIBUTING.md`](CONTRIBUTING.md)
 has both, along with a `socat` one-liner for watching the raw compositor events.
 
+## Dependencies
+
+Nothing is vendored. Every file here is original work covered by the MIT
+license - `Service.qml`, `Panel.qml`, `BarWidget.qml`, `Strip.qml`,
+`ShareModel.js` and `hypr.lua`. There is no build step, no package manifest,
+and no third-party library, font or icon in the tree.
+
+What it expects to find on the system, all of it present in a default Omarchy
+install:
+
+| Component | Used for |
+| --- | --- |
+| Omarchy 4.x shell | Hosts the `service` and `bar-widget` entry points |
+| Quickshell 0.3.1 | `Quickshell`, `.Hyprland`, `.Wayland`, `.Io`, plus Omarchy's `qs.Ui` and `qs.Commons` |
+| Hyprland 0.56.2 | Layer-shell surfaces, the IPC event stream, and the `hl.layer_rule` Lua API `no_screen_share` comes from |
+| xdg-desktop-portal-hyprland | The capture sessions the plugin watches |
+
+External commands it runs:
+
+| Command | When |
+| --- | --- |
+| `sh`, `cat`, `cp`, `date` | Reading config files, and backing one up before either one-click fix writes to it |
+| `hyprctl reload` | After the layer rule fix |
+| `systemctl --user restart xdg-desktop-portal-hyprland` | After the cursor fix |
+| `notify-send` (libnotify) | Only while the Notifications toggle is on |
+
+Development adds Node for `./tests/run`, which uses the standard library only -
+`node:test` and `node:assert`, nothing to install. `tests/audience` and
+`tests/record` also want `grim`, ImageMagick and `python3`.
+
 ## License
 
-MIT - see [`LICENSE`](LICENSE).
+MIT - see [`LICENSE`](LICENSE). No third-party code is bundled; see
+[Dependencies](#dependencies) for what the plugin expects from the system.
