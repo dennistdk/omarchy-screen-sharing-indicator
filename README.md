@@ -11,8 +11,7 @@ surface you actually picked in the share dialog. This plugin adds one.
 ![A red border around a shared Brave window, with the plugin's dropdown open beside it listing one active share and its settings](preview.jpg)
 
 *Photographed off the screen rather than screenshotted: with the layer rule
-loaded the border renders black in any capture, which is precisely the point.
-The numbers are in [`tests/captures.md`](tests/captures.md).*
+loaded the border renders black in any capture, which is precisely the point.*
 
 | | |
 | --- | --- |
