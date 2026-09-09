@@ -62,4 +62,5 @@ Initial release.
   physical pixels, and 8 physical pixels of border colour at the bottom corners
   on a fractionally scaled output. Both are measured in `tests/captures.md`.
 
+[1.0.1]: https://github.com/dennistdk/omarchy-screen-sharing-indicator/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dennistdk/omarchy-screen-sharing-indicator/releases/tag/v1.0.0
