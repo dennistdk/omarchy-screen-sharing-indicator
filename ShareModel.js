@@ -711,6 +711,18 @@ function entryFromConfig(shellConfig, id) {
   return ({})
 }
 
+// Which config surface the host hands over depends on trust level: first-party
+// plugins get all of shell.json as `shellConfig`, installed plugins get
+// PluginShellApi, which carries `barConfig` and no `shellConfig`. Reading only
+// shellConfig left the service searching nothing, pinning every setting to its
+// default. A bar rebuilt here has no plugins[]; the scoped API exposes none.
+function configFromShell(shellApi) {
+  if (!shellApi) return null
+  if (shellApi.shellConfig) return shellApi.shellConfig
+  if (shellApi.barConfig) return ({ bar: shellApi.barConfig })
+  return null
+}
+
 // updateEntryInline (shell.qml:366) rebuilds the entry as {id} plus exactly
 // what it is handed, so a partial write deletes every key it omits. Callers
 // must always send the whole entry; this is how they build it.
@@ -1089,6 +1101,7 @@ if (typeof module !== "undefined") {
     boxesForWindow: boxesForWindow,
     logicalOutputSize: logicalOutputSize,
     entryFromConfig: entryFromConfig,
+    configFromShell: configFromShell,
     mergedSettings: mergedSettings,
     autoBorderColor: autoBorderColor,
     hexToHsl: hexToHsl,

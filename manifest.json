@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.dennistdk.screen-sharing-indicator",
   "name": "Screen Sharing Indicator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Dennis Thomsen",
   "license": "MIT",
   "description": "Presenter-visible red border around the window or monitor currently shared through the desktop portal. The audience sees at most a thin black strip on monitor captures, and nothing at all on window captures.",

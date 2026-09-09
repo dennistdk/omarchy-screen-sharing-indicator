@@ -894,6 +894,26 @@ test("entryFromConfig returns an empty entry when the plugin is absent", () => {
   assert.deepEqual(M.entryFromConfig(null, "screen-sharing-indicator"), {})
 })
 
+test("configFromShell passes a first-party shellConfig straight through", () => {
+  const shellConfig = { bar: { layout: { left: [], center: [], right: [] } }, plugins: [] }
+  assert.equal(M.configFromShell({ shellConfig }), shellConfig)
+})
+
+// PluginShellApi, what an installed plugin is handed, has barConfig and no
+// shellConfig. Reading only shellConfig is what made every setting inert.
+test("configFromShell rebuilds a config from a third-party barConfig", () => {
+  const barConfig = {
+    layout: { left: [], center: [], right: [{ id: "screen-sharing-indicator", widthPx: 4 }] }
+  }
+  const entry = M.entryFromConfig(M.configFromShell({ barConfig }), "screen-sharing-indicator")
+  assert.equal(entry.widthPx, 4)
+})
+
+test("configFromShell yields nothing when neither surface is exposed", () => {
+  assert.equal(M.configFromShell({ pluginId: "screen-sharing-indicator" }), null)
+  assert.equal(M.configFromShell(null), null)
+})
+
 // updateEntryInline rebuilds an entry as {id} plus exactly what it is handed,
 // so anything the panel forgets to send is deleted from the user's config.
 test("mergedSettings never drops a key the caller did not mention", () => {

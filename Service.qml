@@ -21,12 +21,14 @@ Item {
   readonly property string defaultColor: "#E81123"
 
   // Services are not injected `settings` the way bar widgets are, so read the
-  // plugin's own entry out of shell.json. Going through shell.shellConfig keeps
-  // the binding live, so edits apply without restarting the shell. The entry
-  // sits in bar.layout or in plugins[] depending on whether the widget is on
-  // the bar; the registry's resolver decides, and ShareModel mirrors it for
-  // the unit tests and for shells without that function.
-  readonly property var shellConfig: shell && shell.shellConfig ? shell.shellConfig : null
+  // plugin's own entry out of shell.json. configFromShell picks whichever
+  // config surface this plugin's trust level is given; the host reassigns
+  // either on every config change, so the binding stays live and edits apply
+  // without restarting the shell. The entry sits in bar.layout or in plugins[]
+  // depending on whether the widget is on the bar; the registry's resolver
+  // decides, and ShareModel mirrors it for the unit tests and for shells
+  // without that function.
+  readonly property var shellConfig: ShareModel.configFromShell(shell)
   readonly property var settingsEntry: resolveEntry(shellConfig)
 
   function resolveEntry(config) {

@@ -141,14 +141,14 @@ Panel {
       bar.shell.updateEntryInline(root.moduleName, merged)
   }
 
-  // Prefer the live service property, which reflects the moment the shell
-  // finishes applying a write, and fall back to the same default the service
-  // computes from settingsEntry -- so rows read right, and writeSetting still
-  // works off root.settings, during the window where svc is null.
-  readonly property bool activeSetting: svc ? svc.active : (root.setting("active", true) !== false)
-  readonly property bool windowBordersSetting: svc ? svc.showWindowBorders : (root.setting("showWindowBorders", true) !== false)
-  readonly property bool monitorBordersSetting: svc ? svc.showMonitorBorders : (root.setting("showMonitorBorders", true) !== false)
-  readonly property bool notifySetting: svc ? svc.notify : (root.setting("notify", false) === true)
+  // Prefer the entry the bar injects -- the same object writeSetting merges
+  // over -- and fall back to the service's view of it. Both update on the same
+  // config change, so reading the injected settings first costs nothing and
+  // keeps a row honest even if the service's settings source stops resolving.
+  readonly property bool activeSetting: root.setting("active", svc ? svc.active : true) !== false
+  readonly property bool windowBordersSetting: root.setting("showWindowBorders", svc ? svc.showWindowBorders : true) !== false
+  readonly property bool monitorBordersSetting: root.setting("showMonitorBorders", svc ? svc.showMonitorBorders : true) !== false
+  readonly property bool notifySetting: root.setting("notify", svc ? svc.notify : false) === true
 
   // ------------------------------------------------------------ appearance
 
@@ -158,9 +158,19 @@ Panel {
   // that could read as a green "you are safe" border.
   readonly property var colorPresets: ["#E81123", "#FF3B30", "#FF6A00", "#D40030", "#C1121F", "#FF1744"]
 
-  readonly property string colorSetting: svc ? svc.colorSpec : String(root.setting("color", "#E81123") || "#E81123")
-  readonly property string colorModeSetting: svc ? svc.colorMode : (root.setting("colorMode", "fixed") === "auto" ? "auto" : "fixed")
-  readonly property int widthSetting: svc ? svc.widthPx : clampWidth(root.setting("widthPx", 3))
+  readonly property string colorSetting: validColor(root.setting("color", ""), svc ? svc.colorSpec : "#E81123")
+  readonly property string colorModeSetting: root.setting("colorMode", svc ? svc.colorMode : "fixed") === "auto" ? "auto" : "fixed"
+  readonly property int widthSetting: clampWidth(root.setting("widthPx", svc ? svc.widthPx : 3))
+
+  // Mirrors the service's own guard, so a hand-edited colour cannot reach the
+  // swatches or the preview. The service is the one that warns about it.
+  function validColor(value, fallback) {
+    var s = String(value === undefined || value === null ? "" : value).trim()
+    if (!s) return fallback
+    if (/^#([0-9a-fA-F]{3,8})$/.test(s)) return s
+    if (/^[a-zA-Z]+$/.test(s)) return s
+    return fallback
+  }
 
   function clampWidth(value) {
     var n = Math.floor(Number(value))
